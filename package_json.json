@@ -1,0 +1,31 @@
+{
+  "name": "telegram-barter-bot",
+  "version": "1.0.0",
+  "description": "בוט טלגרם לפרסום שירותים בבארטר ותשלום",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "init-db": "node database.js"
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0",
+    "sqlite3": "^5.1.7",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "barter",
+    "hebrew",
+    "marketplace"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
