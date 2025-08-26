@@ -191,6 +191,20 @@ class Database {
                     }
                 });
 
+                // טבלת מצבי משתמשים (Persist) לתהליך פרסום ועוד
+                this.db.run(`
+                    CREATE TABLE IF NOT EXISTS user_states (
+                        user_id INTEGER PRIMARY KEY,
+                        state TEXT NOT NULL,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (user_id)
+                    )
+                `, (err) => {
+                    if (err && !err.message.includes('already exists')) {
+                        console.error('שגיאה ביצירת טבלת user_states:', err);
+                    }
+                });
+
                 // טבלת מילות מפתח להתראות
                 this.db.run(`
                     CREATE TABLE IF NOT EXISTS keyword_alerts (
@@ -851,6 +865,63 @@ class Database {
                 console.error('שגיאה בהגדרת מילות מפתח:', error);
                 reject(error);
             }
+        });
+    }
+
+    // שמירת מצב משתמש מתמשך
+    setPersistentUserState(userId, stateObj) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                INSERT INTO user_states (user_id, state, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    state = excluded.state,
+                    updated_at = CURRENT_TIMESTAMP
+            `;
+            this.db.run(sql, [userId, JSON.stringify(stateObj)], function(err) {
+                if (err) {
+                    console.error('[DEBUG] Error setPersistentUserState:', err);
+                    reject(err);
+                } else {
+                    resolve({ success: true });
+                }
+            });
+        });
+    }
+
+    // שליפת מצב משתמש מתמשך
+    getPersistentUserState(userId) {
+        return new Promise((resolve, reject) => {
+            const sql = `SELECT state FROM user_states WHERE user_id = ?`;
+            this.db.get(sql, [userId], (err, row) => {
+                if (err) {
+                    console.error('[DEBUG] Error getPersistentUserState:', err);
+                    reject(err);
+                } else {
+                    if (!row) return resolve(null);
+                    try {
+                        const obj = JSON.parse(row.state);
+                        resolve(obj);
+                    } catch (e) {
+                        resolve(null);
+                    }
+                }
+            });
+        });
+    }
+
+    // מחיקת מצב מתמשך
+    clearPersistentUserState(userId) {
+        return new Promise((resolve, reject) => {
+            const sql = `DELETE FROM user_states WHERE user_id = ?`;
+            this.db.run(sql, [userId], function(err) {
+                if (err) {
+                    console.error('[DEBUG] Error clearPersistentUserState:', err);
+                    reject(err);
+                } else {
+                    resolve({ success: true });
+                }
+            });
         });
     }
 

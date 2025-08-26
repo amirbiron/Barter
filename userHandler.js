@@ -591,12 +591,34 @@ class UserHandler {
                 
                 // עדכון כפתור שמירה בהודעה
                 try {
-                    const isAdmin = this.config.isAdmin(userId);
-                    const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, false, isAdmin);
-                    await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
-                        chat_id: chatId,
-                        message_id: callbackQuery.message.message_id
-                    });
+                    const isFromAlert = callbackQuery.data.includes('_from_alert');
+                    if (isFromAlert) {
+                        const e = this.emojis;
+                        const replyMarkup = {
+                            inline_keyboard: [
+                                [
+                                    { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
+                                    { text: `${e ? '⭐ ' : ''}שמור`, callback_data: `save_${postId}_from_alert` }
+                                ],
+                                [
+                                    { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
+                                    { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
+                                ],
+                                [{ text: `${e ? '🔙 ' : ''}חזרה להתראות`, callback_data: 'alert_menu' }]
+                            ]
+                        };
+                        await this.bot.editMessageReplyMarkup(replyMarkup, {
+                            chat_id: chatId,
+                            message_id: callbackQuery.message.message_id
+                        });
+                    } else {
+                        const isAdmin = config.isAdmin(userId);
+                        const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, false, isAdmin);
+                        await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
+                            chat_id: chatId,
+                            message_id: callbackQuery.message.message_id
+                        });
+                    }
                 } catch (kbErr) {
                     console.error('[DEBUG] Error updating save button (unsave):', kbErr.message);
                 }
@@ -620,12 +642,34 @@ class UserHandler {
                     
                     // עדכון כפתור שמירה בהודעה
                     try {
-                        const isAdmin = this.config.isAdmin(userId);
-                        const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, true, isAdmin);
-                        await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
-                            chat_id: chatId,
-                            message_id: callbackQuery.message.message_id
-                        });
+                        const isFromAlert = callbackQuery.data.includes('_from_alert');
+                        if (isFromAlert) {
+                            const e = this.emojis;
+                            const replyMarkup = {
+                                inline_keyboard: [
+                                    [
+                                        { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
+                                        { text: `${e ? '💔 ' : ''}הסר ממועדפים`, callback_data: `save_${postId}_from_alert` }
+                                    ],
+                                    [
+                                        { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
+                                        { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
+                                    ],
+                                    [{ text: `${e ? '🔙 ' : ''}חזרה להתראות`, callback_data: 'alert_menu' }]
+                                ]
+                            };
+                            await this.bot.editMessageReplyMarkup(replyMarkup, {
+                                chat_id: chatId,
+                                message_id: callbackQuery.message.message_id
+                            });
+                        } else {
+                            const isAdmin = config.isAdmin(userId);
+                            const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, true, isAdmin);
+                            await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
+                                chat_id: chatId,
+                                message_id: callbackQuery.message.message_id
+                            });
+                        }
                     } catch (kbErr) {
                         console.error('[DEBUG] Error updating save button (save):', kbErr.message);
                     }
@@ -643,12 +687,34 @@ class UserHandler {
                     
                     // וודא שהכפתור מציג מצב "שמורה"
                     try {
-                        const isAdmin = this.config.isAdmin(userId);
-                        const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, true, isAdmin);
-                        await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
-                            chat_id: chatId,
-                            message_id: callbackQuery.message.message_id
-                        });
+                        const isFromAlert = callbackQuery.data.includes('_from_alert');
+                        if (isFromAlert) {
+                            const e = this.emojis;
+                            const replyMarkup = {
+                                inline_keyboard: [
+                                    [
+                                        { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
+                                        { text: `${e ? '💔 ' : ''}הסר ממועדפים`, callback_data: `save_${postId}_from_alert` }
+                                    ],
+                                    [
+                                        { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
+                                        { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
+                                    ],
+                                    [{ text: `${e ? '🔙 ' : ''}חזרה להתראות`, callback_data: 'alert_menu' }]
+                                ]
+                            };
+                            await this.bot.editMessageReplyMarkup(replyMarkup, {
+                                chat_id: chatId,
+                                message_id: callbackQuery.message.message_id
+                            });
+                        } else {
+                            const isAdmin = config.isAdmin(userId);
+                            const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, true, isAdmin);
+                            await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
+                                chat_id: chatId,
+                                message_id: callbackQuery.message.message_id
+                            });
+                        }
                     } catch (kbErr) {
                         console.error('[DEBUG] Error updating save button (already saved):', kbErr.message);
                     }

@@ -42,10 +42,13 @@ function getUserState(userId) {
 
 function setUserState(userId, state) {
     userStates.set(userId, state);
+    // שמירה מתמשכת (async, לא חוסם)
+    db.setPersistentUserState(userId, state).catch(() => {});
 }
 
 function clearUserState(userId) {
     userStates.delete(userId);
+    db.clearPersistentUserState(userId).catch(() => {});
 }
 
 // יצירת מקלדות - עכשיו מ-keyboards.js
@@ -207,8 +210,21 @@ bot.on('message', async (msg) => {
     console.log(`📨 קיבלתי הודעה מ-${userId}: "${text}"`);
     console.log(`🔧 config.bot.useEmojis = ${config.bot.useEmojis}`);
     
-    // בדיקת מצב המשתמש
-    const userState = getUserState(userId);
+    // בדיקת מצב משתמש - נסה לשחזר מה-DB אם צריך
+    let userState = getUserState(userId);
+    if (!userStates.has(userId)) {
+        try {
+            const persisted = await db.getPersistentUserState(userId);
+            if (persisted) {
+                userStates.set(userId, persisted);
+                userState = persisted;
+                console.log(`♻️ שוחזר מצב משתמש מה-DB:`, userState);
+                await bot.sendMessage(chatId, '✅ המשכנו מאיפה שעצרת');
+            }
+        } catch (e) {
+            // ignore
+        }
+    }
     console.log(`👤 מצב משתמש ${userId}:`, userState);
     
     try {
@@ -437,6 +453,17 @@ bot.on('message', async (msg) => {
 
 // פונקציות עיקריות
 async function startPostCreation(chatId, userId) {
+    // תחזוקה: חסימת יצירת מודעה בזמן דיפלוי/תחזוקה
+    if (process.env.MAINTENANCE_MODE === 'true') {
+        await bot.sendMessage(chatId,
+            '🔧 הבוט בתהליך עדכון קצר כרגע...\n\n' +
+            'אנא נסו שוב בעוד כדקה...',
+            getMainKeyboard()
+        );
+        clearUserState(userId);
+        return;
+    }
+    
     // בדיקת מגבלת מודעות למשתמש
     const userPosts = await db.getUserPosts(userId);
     const activePostsCount = userPosts.filter(post => !post.deleted_at).length;
@@ -465,6 +492,18 @@ async function handlePostCreation(msg, userState) {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     const text = msg.text;
+    
+    // תחזוקה: עצירת תהליך פרסום בזמן דיפלוי/תחזוקה
+    if (process.env.MAINTENANCE_MODE === 'true') {
+        await bot.sendMessage(chatId,
+            '🔧 כרגע מתבצע עדכון קצר למערכת.\n\n' +
+            'ההתקדמות בתהליך פרסום נעצרה זמנית.\n' +
+            'אנא נסו שוב בעוד מספר דקות.',
+            getMainKeyboard()
+        );
+        clearUserState(userId);
+        return;
+    }
     
     switch (userState.step) {
         case 'title':
@@ -721,6 +760,20 @@ bot.on('callback_query', async (callbackQuery) => {
     const userId = callbackQuery.from.id;
     const data = callbackQuery.data;
     
+    // שחזור מצב משתמש אם לא קיים בזיכרון
+    if (!userStates.has(userId)) {
+        try {
+            const persisted = await db.getPersistentUserState(userId);
+            if (persisted) {
+                userStates.set(userId, persisted);
+                console.log(`♻️ שוחזר מצב משתמש מה-DB (callback):`, persisted);
+                await bot.sendMessage(chatId, '✅ המשכנו מאיפה שעצרת');
+            }
+        } catch (e) {
+            // ignore
+        }
+    }
+    
     try {
         await bot.answerCallbackQuery(callbackQuery.id);
         
@@ -730,12 +783,13 @@ bot.on('callback_query', async (callbackQuery) => {
         } else if (data.startsWith('visibility_')) {
             await handleVisibilitySelection(chatId, userId, data);
         } else if (data.startsWith('view_post_')) {
-            // Handler for viewing posts from browse list or search results
+            // Handler for viewing posts from browse list, search results, or alerts
             const parts = data.split('_');
             const postId = parseInt(parts[2]);
-            const fromBrowse = parts[3] === 'from';
+            const isFrom = parts[3] === 'from';
+            const origin = isFrom ? parts[4] : null;
             
-            if (fromBrowse) {
+            if (isFrom && origin === 'browse') {
                 // Extract browse context (browse type and page)
                 const browseType = parts[5];
                 const page = parts[6] || 1;
@@ -747,20 +801,27 @@ bot.on('callback_query', async (callbackQuery) => {
                     
                     // Create custom keyboard with back to browse button
                     const e = config.bot.useEmojis;
+                    const isAdmin = config.isAdmin(userId);
+                    const inline = [
+                        [
+                            { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
+                            { text: `${e ? '⭐ ' : ''}שמור`, callback_data: `save_${postId}` }
+                        ],
+                        [
+                            { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
+                            { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
+                        ]
+                    ];
+                    if (isAdmin) {
+                        inline.push([
+                            { text: `${e ? '🗑️ ' : ''}מחק מודעה`, callback_data: `admin_delete_${postId}` },
+                            { text: `${e ? '🔙 ' : ''}חזרה לרשימה`, callback_data: `browse_${browseType}_page_${page}` }
+                        ]);
+                    } else {
+                        inline.push([{ text: `${e ? '🔙 ' : ''}חזרה לרשימה`, callback_data: `browse_${browseType}_page_${page}` }]);
+                    }
                     const keyboard = {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [
-                                    { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
-                                    { text: `${e ? '⭐ ' : ''}שמור`, callback_data: `save_${postId}` }
-                                ],
-                                [
-                                    { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
-                                    { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
-                                ],
-                                [{ text: `${e ? '🔙 ' : ''}חזרה לרשימה`, callback_data: `browse_${browseType}_page_${page}` }]
-                            ]
-                        }
+                        reply_markup: { inline_keyboard: inline }
                     };
                     
                     await bot.editMessageText(postMessage, {
@@ -776,6 +837,45 @@ bot.on('callback_query', async (callbackQuery) => {
                     await bot.answerCallbackQuery(callbackQuery.id, {
                         text: 'המודעה לא נמצאה',
                         show_alert: false
+                    });
+                }
+            } else if (isFrom && origin === 'alert') {
+                // View post from an alert - use back-to-alerts keyboard and save carries alert context
+                const post = await db.getPost(postId);
+                
+                if (post && post.is_active) {
+                    const postMessage = formatPostMessage(post);
+                    const e = config.bot.useEmojis;
+                    const keyboard = {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
+                                    { text: `${e ? '⭐ ' : ''}שמור`, callback_data: `save_${postId}_from_alert` }
+                                ],
+                                [
+                                    { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
+                                    { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
+                                ],
+                                [{ text: `${e ? '🔙 ' : ''}חזרה להתראות`, callback_data: 'alert_menu' }]
+                            ]
+                        }
+                    };
+                    
+                    // Edit the original alert message in-place
+                    await bot.editMessageText(postMessage, {
+                        chat_id: chatId,
+                        message_id: msg.message_id,
+                        parse_mode: 'Markdown',
+                        ...keyboard
+                    });
+                    
+                    userHandler.trackInteraction(userId, postId, 'view');
+                    utils.logAction(userId, 'view_post_from_alert', { postId });
+                } else {
+                    await bot.answerCallbackQuery(callbackQuery.id, {
+                        text: 'המודעה לא נמצאה',
+                        show_alert: true
                     });
                 }
             } else {
@@ -803,6 +903,13 @@ bot.on('callback_query', async (callbackQuery) => {
             }
         } else if (data === 'back_to_browse_options') {
             // Return to browse options menu
+            await bot.editMessageText('📱 איך תרצו לדפדף?', {
+                chat_id: chatId,
+                message_id: msg.message_id,
+                ...getBrowseKeyboard()
+            });
+        } else if (data === 'back_to_browse') {
+            // Normalize legacy back button to browse options
             await bot.editMessageText('📱 איך תרצו לדפדף?', {
                 chat_id: chatId,
                 message_id: msg.message_id,
@@ -933,8 +1040,18 @@ bot.on('callback_query', async (callbackQuery) => {
         } else if (data.startsWith('confirm_delete_')) {
             await userHandler.executeDeletePost(callbackQuery);
         } else if (data.startsWith('cancel_delete_')) {
-            // ביטול מחיקה - חזרה למודעות שלי
-            await userHandler.showUserPostsDetailed(chatId, userId);
+            // ביטול מחיקה - חזרה לתצוגת המודעה בלבד
+            const postId = parseInt(data.replace('cancel_delete_', ''));
+            const post = await db.getPost(postId);
+            if (post) {
+                const postMessage = formatPostMessage(post);
+                await bot.editMessageText(postMessage, {
+                    chat_id: chatId,
+                    message_id: msg.message_id,
+                    parse_mode: 'Markdown',
+                    ...getPostActionsKeyboard(postId, userId)
+                });
+            }
             await bot.answerCallbackQuery(callbackQuery.id, {
                 text: 'המחיקה בוטלה',
                 show_alert: false
@@ -1455,8 +1572,8 @@ async function checkAndSendAlerts(postId, postTitle, postDescription, postUserId
                         reply_markup: {
                             inline_keyboard: [
                                 [
-                                    { text: '👁️ צפה במודעה', callback_data: `view_${postId}` },
-                                    { text: '⭐ שמור', callback_data: `save_${postId}` }
+                                    { text: '👁️ צפה במודעה', callback_data: `view_post_${postId}_from_alert` },
+                                    { text: '⭐ שמור', callback_data: `save_${postId}_from_alert` }
                                 ]
                             ]
                         }

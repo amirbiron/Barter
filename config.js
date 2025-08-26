@@ -39,10 +39,13 @@ class Config {
                 interval: 1000,
                 autoStart: true
             },
-            // רשימת מנהלים - ניתן להגדיר דרך משתנה סביבה ADMIN_IDS מופרד בפסיקים
-            adminIds: process.env.ADMIN_IDS ? 
-                process.env.ADMIN_IDS.split(',').map(id => parseInt(id.trim())) : 
-                []
+            // רשימת מנהלים - תמיכה גם ב-ADMIN_IDS וגם ב-ADMIN_USER_IDS
+            adminIds: (() => {
+                const parseIds = (s) => (s ? s.split(',').map(id => parseInt(id.trim())).filter(Boolean) : []);
+                const idsA = parseIds(process.env.ADMIN_IDS);
+                const idsB = parseIds(process.env.ADMIN_USER_IDS);
+                return Array.from(new Set([...idsA, ...idsB]));
+            })()
         };
 
         // 🗃️ הגדרות בסיס נתונים
