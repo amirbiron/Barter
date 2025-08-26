@@ -491,8 +491,7 @@ class UserHandler {
                     {
                         chat_id: chatId,
                         message_id: callbackQuery.message.message_id,
-                        parse_mode: 'Markdown',
-                        ...keyboards.getMainKeyboard()
+                        parse_mode: 'Markdown'
                     }
                 );
 
@@ -637,7 +636,7 @@ class UserHandler {
                 // מנקה את הכותרת מתווים בעייתיים
                 const cleanTitle = post.title.replace(/[_*\[\]()~`>#+\-=|{}.!\\]/g, '');
                 
-                message += `${e ? '📌' : '•'} *${cleanTitle}*\n`;
+                message += `${e ? '📌' : '•'} ${cleanTitle}\n`;
                 message += `${e ? '💰' : ''} ${pricingStyle.name}\n`;
                 message += `${e ? '📅' : ''} נשמר ב: ${savedDate}\n`;
                 message += `${e ? '👁' : ''} /view_${post.id}\n\n`;
