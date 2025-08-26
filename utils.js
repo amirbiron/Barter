@@ -12,14 +12,14 @@ class Utils {
     // 📅 פונקציות זמן ותאריך
     formatDate(date, locale = 'he-IL') {
         if (!date) {return 'לא ידוע';}
-
+        
         try {
             const d = new Date(date);
             return d.toLocaleDateString(locale, {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric',
-                timeZone: config.server.timezone,
+                timeZone: config.server.timezone
             });
         } catch (error) {
             return 'תאריך לא תקין';
@@ -28,7 +28,7 @@ class Utils {
 
     formatDateTime(date, locale = 'he-IL') {
         if (!date) {return 'לא ידוע';}
-
+        
         try {
             const d = new Date(date);
             return d.toLocaleString(locale, {
@@ -38,7 +38,7 @@ class Utils {
                 hour: '2-digit',
                 minute: '2-digit',
                 timeZone: config.server.timezone,
-                hour12: false,
+                hour12: false
             });
         } catch (error) {
             return 'זמן לא תקין';
@@ -47,26 +47,22 @@ class Utils {
 
     getTimeAgo(date, locale = 'he') {
         if (!date) {return 'זמן לא ידוע';}
-
+        
         const now = new Date();
         const past = new Date(date);
         const diffMs = now - past;
-
+        
         const diffMinutes = Math.floor(diffMs / (1000 * 60));
         const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
         const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
         const diffWeeks = Math.floor(diffDays / 7);
         const diffMonths = Math.floor(diffDays / 30);
 
-        if (diffMinutes < 1) {return 'עכשיו';}
-        if (diffMinutes < 60) {return `לפני ${diffMinutes} דקות`;}
-        if (diffHours < 24) {return `לפני ${diffHours} שעות`;}
-        if (diffDays < 7) {return `לפני ${diffDays} ימים`;}
-        if (diffWeeks < 4) {return `לפני ${diffWeeks} שבועות`;}
-        if (diffMonths < 12) {return `לפני ${diffMonths} חודשים`;}
-
-        const diffYears = Math.floor(diffMonths / 12);
-        return `לפני ${diffYears} שנים`;
+        if (diffMinutes < 60) {return `${diffMinutes} דקות`;}
+        if (diffHours < 48) {return `${diffHours} שעות`;}
+        if (diffDays < 14) {return `${diffDays} ימים`;}
+        if (diffWeeks < 8) {return `${diffWeeks} שבועות`;}
+        return `${diffMonths} חודשים`;
     }
 
     // 🔍 פונקציות טקסט וחיפוש
@@ -87,7 +83,9 @@ class Utils {
 
     escapeMarkdown(text) {
         if (!text) {return '';}
-        return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
+        // Escape MarkdownV2 special characters
+        // See: https://core.telegram.org/bots/api#markdownv2-style
+        return text.replace(/([_\*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
     }
 
     highlightSearchTerms(text, searchTerms) {
@@ -98,8 +96,8 @@ class Utils {
 
         terms.forEach((term) => {
             if (term.length > 2) {
-                const regex = new RegExp(`(${this.escapeRegExp(term)})`, 'gi');
-                result = result.replace(regex, '*$1*');
+                const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                result = result.replace(regex, '**$1**');
             }
         });
 
@@ -464,7 +462,7 @@ class Utils {
         if (typeof obj === 'object') {
             const cloned = {};
             for (const key in obj) {
-                if (obj.hasOwnProperty(key)) {
+                if (Object.prototype.hasOwnProperty.call(obj, key)) {
                     cloned[key] = this.deepClone(obj[key]);
                 }
             }

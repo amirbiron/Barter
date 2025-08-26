@@ -303,7 +303,7 @@ class UserHandler {
                 }
                 return { isValid: true, value: utils.sanitizeText(input) };
 
-            case 'pricing':
+            case 'pricing': {
                 // טיפול במצב תמחור
                 const lowerInput = input.trim().toLowerCase();
                 let pricingMode = null;
@@ -338,29 +338,30 @@ class UserHandler {
                     value: pricingMode,
                     formatted: pricingStyle.name,
                 };
-
-            case 'tags':
+            }
+            case 'tags': {
                 const tags = utils.validateTags(input);
                 return {
                     isValid: true,
                     value: tags,
                     formatted: utils.formatTags(tags),
                 };
-
-            case 'links':
+            }
+            case 'links': {
                 const linkValidation = utils.validateLinks(input);
                 return {
                     isValid: true,
                     value: linkValidation.links.join('\n'),
                     formatted: utils.formatLinks(linkValidation.links),
                 };
-
-            case 'contact':
+            }
+            case 'contact': {
                 const contactValidation = utils.validateContact(input);
                 if (!contactValidation.isValid) {
                     return { isValid: false, error: contactValidation.error };
                 }
                 return { isValid: true, value: contactValidation.formatted };
+            }
 
             default:
                 return { isValid: false, error: 'שדה לא מוכר' };

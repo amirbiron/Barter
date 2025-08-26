@@ -615,7 +615,7 @@ async function handlePostCreation(msg, userState) {
             await bot.sendMessage(chatId, '💡 איך אתם מעוניינים לקבל תמורה?', getPricingKeyboard());
             break;
 
-        case 'price_range':
+        case 'price_range': {
             const priceValidation = utils.validatePriceRange(text);
             if (!priceValidation.isValid) {
                 await bot.sendMessage(
@@ -634,9 +634,10 @@ async function handlePostCreation(msg, userState) {
                 chatId,
                 '🔗 הוסיפו קישורים לתיק עבודות או דף נחיתה (או הקלידו "דלג"):'
             );
+        }
             break;
 
-        case 'portfolio':
+        case 'portfolio': {
             const linkValidation = utils.validateLinks(text);
             const portfolioLinks =
                 linkValidation.links.length > 0 ? linkValidation.links.join('\n') : null;
@@ -647,9 +648,10 @@ async function handlePostCreation(msg, userState) {
                 portfolio_links: portfolioLinks,
             });
             await bot.sendMessage(chatId, '📞 הקלידו את פרטי הקשר שלכם (טלפון/אימייל/טלגרם):');
+        }
             break;
 
-        case 'contact':
+        case 'contact': {
             const contactValidation = utils.validateContact(text);
             if (!contactValidation.isValid) {
                 await bot.sendMessage(chatId, `❌ ${contactValidation.error}\n\nנסו שוב:`);
@@ -665,9 +667,10 @@ async function handlePostCreation(msg, userState) {
                 chatId,
                 '🏷️ הוסיפו תגיות לשירות (הפרידו בפסיקים) או הקלידו "דלג":\n\nדוגמא: עיצוב, גרפיקה, לוגו'
             );
+        }
             break;
 
-        case 'tags':
+        case 'tags': {
             const tags = utils.validateTags(text === 'דלג' ? '' : text);
 
             // בדיקה אם המשתמש הוא מנהל
@@ -694,6 +697,7 @@ async function handlePostCreation(msg, userState) {
                 // משתמשים רגילים - ישר לשמירה כמודעה ציבורית
                 await savePost(chatId, userId, { ...userState, tags, visibility: 'public' });
             }
+        }
             break;
     }
 }
