@@ -225,8 +225,9 @@ bot.on('message', async (msg) => {
             return;
         }
         
-        // אם המשתמש באמצע תהליך פרסום
-        if (userState.step && userState.step !== 'main' && userState.step !== 'search') {
+        // אם המשתמש באמצע תהליך פרסום (לא כולל חיפוש)
+        const searchStates = ['search', 'search_type', 'search_titles', 'search_full'];
+        if (userState.step && userState.step !== 'main' && !searchStates.includes(userState.step)) {
             console.log(`📝 משתמש ${userId} באמצע תהליך פרסום, step: ${userState.step}`);
             await handlePostCreation(msg, userState);
             return;
