@@ -80,6 +80,38 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
         // שמירת פרטי משתמש
         await db.upsertUser(userId, msg.from.username, msg.from.first_name);
         
+        // הגדרת תפריט פקודות בהתאם להרשאות
+        if (config.isAdmin(userId)) {
+            // תפריט פקודות למנהלים
+            await bot.setChatMenuButton({
+                chat_id: chatId,
+                menu_button: {
+                    type: 'commands'
+                }
+            });
+            
+            // הגדרת הפקודות למנהל
+            await bot.setMyCommands([
+                { command: 'testpost', description: '🔧 יצירת מודעת בדיקה פרטית' },
+                { command: 'start', description: '🏠 התחלה מחדש' }
+            ], {
+                scope: {
+                    type: 'chat',
+                    chat_id: chatId
+                }
+            });
+            
+            console.log(`✅ תפריט פקודות מנהל הוגדר למשתמש ${userId}`);
+        } else {
+            // משתמשים רגילים - בלי תפריט פקודות מיוחד
+            await bot.setChatMenuButton({
+                chat_id: chatId,
+                menu_button: {
+                    type: 'default'
+                }
+            });
+        }
+        
         // בדיקה אם יש פרמטר של מודעה
         if (param && param.startsWith('post_')) {
             const postId = parseInt(param.replace('post_', ''));
