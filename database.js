@@ -1,8 +1,38 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 
-// נתיב לבסיס הנתונים - יישמר בתיקיית הפרויקט
-const DB_PATH = path.join(__dirname, 'barter_bot.db');
+// נתיב לבסיס הנתונים - בדיקה אם רצים על Render עם דיסק קבוע
+// ב-Render, הדיסק הקבוע בדרך כלל ממופה ל-/opt/render/project/data או /var/data
+const getDatabasePath = () => {
+    // רשימת נתיבים אפשריים לדיסק קבוע ב-Render
+    const possiblePaths = [
+        '/opt/render/project/data',  // נתיב נפוץ ב-Render
+        '/var/data',                  // נתיב אפשרי אחר
+        process.env.PERSISTENT_STORAGE_DIR, // אם הגדרת משתנה סביבה
+    ].filter(Boolean);
+
+    // בדיקה איזה נתיב קיים וניתן לכתיבה
+    for (const dirPath of possiblePaths) {
+        try {
+            if (fs.existsSync(dirPath)) {
+                // בדיקה אם יש הרשאות כתיבה
+                fs.accessSync(dirPath, fs.constants.W_OK);
+                console.log(`📁 משתמש בדיסק קבוע: ${dirPath}`);
+                return path.join(dirPath, 'barter_bot.db');
+            }
+        } catch (err) {
+            // המשך לנתיב הבא
+        }
+    }
+
+    // אם אין דיסק קבוע, השתמש בתיקייה מקומית (לפיתוח)
+    console.log('⚠️ לא נמצא דיסק קבוע, משתמש בתיקייה מקומית');
+    return path.join(__dirname, 'barter_bot.db');
+};
+
+const DB_PATH = getDatabasePath();
+console.log(`💾 נתיב מסד הנתונים: ${DB_PATH}`);
 
 class Database {
     constructor() {
