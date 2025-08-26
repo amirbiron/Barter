@@ -86,26 +86,69 @@ class KeyboardManager {
         };
     }
 
+    // 📄 פעולות על מודעה עם אפשרות מחיקה למנהלים
+    getPostActionsKeyboardForAdmin(postId, isAdmin = false) {
+        const e = this.emojis;
+        
+        const keyboard = [
+            [
+                { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
+                { text: `${e ? '⭐ ' : ''}שמור`, callback_data: `save_${postId}` }
+            ],
+            [
+                { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
+                { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
+            ]
+        ];
+
+        // הוסף כפתור מחיקה למנהלים
+        if (isAdmin) {
+            keyboard.push([
+                { text: `${e ? '🗑️ ' : ''}מחק מודעה`, callback_data: `admin_delete_${postId}` },
+                { text: `${e ? '🔙 ' : ''}חזרה`, callback_data: 'back_to_browse' }
+            ]);
+        } else {
+            keyboard.push([{ text: `${e ? '🔙 ' : ''}חזרה`, callback_data: 'back_to_browse' }]);
+        }
+        
+        return {
+            reply_markup: {
+                inline_keyboard: keyboard
+            }
+        };
+    }
+
     // 📄 פעולות על מודעה עם סטטוס שמירה
-    getPostActionsKeyboardWithSaveStatus(postId, isSaved = false) {
+    getPostActionsKeyboardWithSaveStatus(postId, isSaved = false, isAdmin = false) {
         const e = this.emojis;
         const saveButtonText = isSaved ? 
             `${e ? '💔 ' : ''}הסר ממועדפים` : 
             `${e ? '⭐ ' : ''}שמור`;
         
+        const keyboard = [
+            [
+                { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
+                { text: saveButtonText, callback_data: `save_${postId}` }
+            ],
+            [
+                { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
+                { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
+            ]
+        ];
+
+        // הוסף כפתור מחיקה למנהלים
+        if (isAdmin) {
+            keyboard.push([
+                { text: `${e ? '🗑️ ' : ''}מחק מודעה`, callback_data: `admin_delete_${postId}` },
+                { text: `${e ? '🔙 ' : ''}חזרה`, callback_data: 'back_to_browse' }
+            ]);
+        } else {
+            keyboard.push([{ text: `${e ? '🔙 ' : ''}חזרה`, callback_data: 'back_to_browse' }]);
+        }
+        
         return {
             reply_markup: {
-                inline_keyboard: [
-                    [
-                        { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
-                        { text: saveButtonText, callback_data: `save_${postId}` }
-                    ],
-                    [
-                        { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
-                        { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
-                    ],
-                    [{ text: `${e ? '🔙 ' : ''}חזרה`, callback_data: 'back_to_browse' }]
-                ]
+                inline_keyboard: keyboard
             }
         };
     }
