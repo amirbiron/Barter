@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Init database
+        run: npm run init-db
+        env:
+          DATABASE_PATH: ${{ runner.temp }}/barter_bot.db
+
+      - name: Smoke test
+        run: npm run smoke
+        env:
+          DATABASE_PATH: ${{ runner.temp }}/barter_bot.db
+
+      # בעתיד: הוסף בדיקות יחידה
+      # - run: npm test
+
+      # על build (לא מפיל) סריקת פגיעויות (בינוניות ומעלה)
+      - name: Audit (non-blocking, high+)
+        run: npm audit --audit-level=high || true
+
+      # לינט לא חוסם (מצב אזהרות בלבד)
+      - name: Lint (non-blocking)
+        run: npm run lint || true
+

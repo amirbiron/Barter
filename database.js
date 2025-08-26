@@ -9,7 +9,7 @@ const getDatabasePath = () => {
         console.log(`📁 משתמש בנתיב מוגדר: ${process.env.DATABASE_PATH}`);
         return process.env.DATABASE_PATH;
     }
-    
+
     // אם אנחנו ב-Render
     if (process.env.RENDER) {
         // נסה קודם את הדיסק המתמיד
@@ -20,14 +20,14 @@ const getDatabasePath = () => {
                 fs.mkdirSync(persistentPath, { recursive: true });
                 console.log('📁 נוצרה תיקיית דיסק מתמיד');
             }
-            
+
             // בדוק הרשאות כתיבה
             fs.accessSync(persistentPath, fs.constants.W_OK);
             console.log('📁 Render: משתמש בדיסק מתמיד');
             return path.join(persistentPath, 'barter_bot.db');
         } catch (err) {
             console.log('⚠️ אין הרשאות כתיבה לדיסק המתמיד:', err.message);
-            
+
             // אם אין הרשאות, השתמש ב-/tmp
             console.log('📁 Render: משתמש בתיקיית /tmp (זמני - יימחק בכל deploy!)');
             const tmpDir = '/tmp/barter_bot_data';
@@ -37,7 +37,7 @@ const getDatabasePath = () => {
             return path.join(tmpDir, 'barter_bot.db');
         }
     }
-    
+
     // ברירת מחדל - תיקייה מקומית
     console.log('📁 משתמש בתיקייה מקומית');
     return path.join(__dirname, 'barter_bot.db');
@@ -53,7 +53,7 @@ class Database {
             if (err) {
                 console.error('❌ שגיאה בפתיחת בסיס הנתונים:', err.message);
                 console.error('נתיב:', DB_PATH);
-                
+
                 // אם הבעיה היא הרשאות, נסה ליצור קובץ חדש
                 if (err.code === 'SQLITE_READONLY' || err.code === 'SQLITE_CANTOPEN') {
                     console.log('🔄 מנסה ליצור מסד נתונים חדש...');
@@ -62,7 +62,7 @@ class Database {
                     if (!fs.existsSync(dir)) {
                         fs.mkdirSync(dir, { recursive: true });
                     }
-                    
+
                     // נסה שוב
                     this.db = new sqlite3.Database(DB_PATH, (err2) => {
                         if (err2) {
@@ -120,15 +120,18 @@ class Database {
                 `);
 
                 // Migration: הוספת עמודת visibility לטבלה קיימת
-                this.db.run(`
+                this.db.run(
+                    `
                     ALTER TABLE posts ADD COLUMN visibility TEXT DEFAULT 'public'
-                `, (err) => {
-                    if (err && !err.message.includes('duplicate column')) {
-                        console.log('⚠️ לא ניתן להוסיף עמודת visibility (כנראה כבר קיימת)');
-                    } else if (!err) {
-                        console.log('✅ עמודת visibility נוספה לטבלת posts');
+                `,
+                    (err) => {
+                        if (err && !err.message.includes('duplicate column')) {
+                            console.log('⚠️ לא ניתן להוסיף עמודת visibility (כנראה כבר קיימת)');
+                        } else if (!err) {
+                            console.log('✅ עמודת visibility נוספה לטבלת posts');
+                        }
                     }
-                });
+                );
 
                 // טבלת FTS5 לחיפוש מהיר (Virtual Table)
                 this.db.run(`
@@ -166,7 +169,8 @@ class Database {
                 `);
 
                 // טבלת מועדפים - שמירת מודעות למשתמשים
-                this.db.run(`
+                this.db.run(
+                    `
                     CREATE TABLE IF NOT EXISTS saved_posts (
                         user_id INTEGER NOT NULL,
                         post_id INTEGER NOT NULL,
@@ -175,38 +179,47 @@ class Database {
                         FOREIGN KEY (user_id) REFERENCES users (user_id),
                         FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE
                     )
-                `, (err) => {
-                    if (err && !err.message.includes('already exists')) {
-                        console.error('שגיאה ביצירת טבלת saved_posts:', err);
+                `,
+                    (err) => {
+                        if (err && !err.message.includes('already exists')) {
+                            console.error('שגיאה ביצירת טבלת saved_posts:', err);
+                        }
                     }
-                });
+                );
 
                 // אינדקס לשיפור ביצועים
-                this.db.run(`
+                this.db.run(
+                    `
                     CREATE INDEX IF NOT EXISTS idx_saved_posts_user 
                     ON saved_posts(user_id)
-                `, (err) => {
-                    if (err && !err.message.includes('already exists')) {
-                        console.error('שגיאה ביצירת אינדקס:', err);
+                `,
+                    (err) => {
+                        if (err && !err.message.includes('already exists')) {
+                            console.error('שגיאה ביצירת אינדקס:', err);
+                        }
                     }
-                });
+                );
 
                 // טבלת מצבי משתמשים (Persist) לתהליך פרסום ועוד
-                this.db.run(`
+                this.db.run(
+                    `
                     CREATE TABLE IF NOT EXISTS user_states (
                         user_id INTEGER PRIMARY KEY,
                         state TEXT NOT NULL,
                         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                         FOREIGN KEY (user_id) REFERENCES users (user_id)
                     )
-                `, (err) => {
-                    if (err && !err.message.includes('already exists')) {
-                        console.error('שגיאה ביצירת טבלת user_states:', err);
+                `,
+                    (err) => {
+                        if (err && !err.message.includes('already exists')) {
+                            console.error('שגיאה ביצירת טבלת user_states:', err);
+                        }
                     }
-                });
+                );
 
                 // טבלת מילות מפתח להתראות
-                this.db.run(`
+                this.db.run(
+                    `
                     CREATE TABLE IF NOT EXISTS keyword_alerts (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         user_id INTEGER NOT NULL,
@@ -216,14 +229,17 @@ class Database {
                         FOREIGN KEY (user_id) REFERENCES users (user_id),
                         UNIQUE(user_id, keyword)
                     )
-                `, (err) => {
-                    if (err && !err.message.includes('already exists')) {
-                        console.error('שגיאה ביצירת טבלת keyword_alerts:', err);
+                `,
+                    (err) => {
+                        if (err && !err.message.includes('already exists')) {
+                            console.error('שגיאה ביצירת טבלת keyword_alerts:', err);
+                        }
                     }
-                });
+                );
 
                 // טבלת היסטוריית התראות שנשלחו
-                this.db.run(`
+                this.db.run(
+                    `
                     CREATE TABLE IF NOT EXISTS sent_alerts (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         user_id INTEGER NOT NULL,
@@ -234,30 +250,38 @@ class Database {
                         FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE,
                         UNIQUE(user_id, post_id, keyword)
                     )
-                `, (err) => {
-                    if (err && !err.message.includes('already exists')) {
-                        console.error('שגיאה ביצירת טבלת sent_alerts:', err);
+                `,
+                    (err) => {
+                        if (err && !err.message.includes('already exists')) {
+                            console.error('שגיאה ביצירת טבלת sent_alerts:', err);
+                        }
                     }
-                });
+                );
 
                 // אינדקסים לשיפור ביצועים
-                this.db.run(`
+                this.db.run(
+                    `
                     CREATE INDEX IF NOT EXISTS idx_keyword_alerts_user 
                     ON keyword_alerts(user_id)
-                `, (err) => {
-                    if (err && !err.message.includes('already exists')) {
-                        console.error('שגיאה ביצירת אינדקס keyword_alerts:', err);
+                `,
+                    (err) => {
+                        if (err && !err.message.includes('already exists')) {
+                            console.error('שגיאה ביצירת אינדקס keyword_alerts:', err);
+                        }
                     }
-                });
+                );
 
-                this.db.run(`
+                this.db.run(
+                    `
                     CREATE INDEX IF NOT EXISTS idx_sent_alerts_user_post 
                     ON sent_alerts(user_id, post_id)
-                `, (err) => {
-                    if (err && !err.message.includes('already exists')) {
-                        console.error('שגיאה ביצירת אינדקס sent_alerts:', err);
+                `,
+                    (err) => {
+                        if (err && !err.message.includes('already exists')) {
+                            console.error('שגיאה ביצירת אינדקס sent_alerts:', err);
+                        }
                     }
-                });
+                );
 
                 console.log('✅ בסיס הנתונים הוכן בהצלחה');
                 resolve();
@@ -272,9 +296,9 @@ class Database {
                 INSERT OR REPLACE INTO users (user_id, username, first_name, created_at)
                 VALUES (?, ?, ?, COALESCE((SELECT created_at FROM users WHERE user_id = ?), CURRENT_TIMESTAMP))
             `;
-            this.db.run(sql, [userId, username, firstName, userId], function(err) {
-                if (err) reject(err);
-                else resolve(this.lastID);
+            this.db.run(sql, [userId, username, firstName, userId], function (err) {
+                if (err) {reject(err);}
+                else {resolve(this.lastID);}
             });
         });
     }
@@ -282,29 +306,53 @@ class Database {
     // יצירת מודעה חדשה
     createPost(postData) {
         return new Promise((resolve, reject) => {
-            const { userId, title, description, pricingMode, priceRange, portfolioLinks, contactInfo, tags, visibility } = postData;
+            const {
+                userId,
+                title,
+                description,
+                pricingMode,
+                priceRange,
+                portfolioLinks,
+                contactInfo,
+                tags,
+                visibility,
+            } = postData;
             const tagsJson = JSON.stringify(tags || []);
             const postVisibility = visibility || 'public'; // ברירת מחדל: ציבורי
-            
+
             const sql = `
                 INSERT INTO posts (user_id, title, description, pricing_mode, price_range, portfolio_links, contact_info, tags, visibility)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
-            
-            this.db.run(sql, [userId, title, description, pricingMode, priceRange, portfolioLinks, contactInfo, tagsJson, postVisibility], function(err) {
-                if (err) reject(err);
-                else resolve(this.lastID);
-            });
+
+            this.db.run(
+                sql,
+                [
+                    userId,
+                    title,
+                    description,
+                    pricingMode,
+                    priceRange,
+                    portfolioLinks,
+                    contactInfo,
+                    tagsJson,
+                    postVisibility,
+                ],
+                function (err) {
+                    if (err) {reject(err);}
+                    else {resolve(this.lastID);}
+                }
+            );
         });
     }
 
     // חיפוש בכותרות בלבד
     searchPostsByTitle(query, filters = {}) {
         console.log(`📌 searchPostsByTitle נקראת עם query: "${query}", filters:`, filters);
-        
+
         return new Promise((resolve, reject) => {
             let sql, params;
-            
+
             if (query && query.trim()) {
                 // חיפוש בכותרות בלבד עם LIKE - מסנן מודעות פרטיות
                 sql = `
@@ -316,12 +364,11 @@ class Database {
                 `;
                 params = [`%${query}%`];
                 console.log(`📌 חיפוש בכותרות: "${query}"`);
-                
+
                 // הוספת סינונים
                 if (filters.pricingMode) {
                     sql += ` AND p.pricing_mode IN ('${filters.pricingMode}', 'both')`;
                 }
-                
             } else {
                 // אם אין חיפוש טקסט, הצג את כל המודעות הציבוריות
                 sql = `
@@ -333,17 +380,17 @@ class Database {
                 `;
                 params = [];
                 console.log('📌 אין query - מחזיר את כל המודעות הציבוריות');
-                
+
                 if (filters.pricingMode) {
                     sql += ` AND p.pricing_mode IN ('${filters.pricingMode}', 'both')`;
                 }
             }
-            
+
             sql += ` ORDER BY p.created_at DESC LIMIT 20`;
-            
+
             console.log('🔧 SQL query:', sql.replace(/\s+/g, ' ').trim());
             console.log('🔧 Parameters:', params);
-            
+
             this.db.all(sql, params, (err, rows) => {
                 if (err) {
                     console.error('❌ שגיאת מסד נתונים בחיפוש כותרות:', err);
@@ -351,9 +398,9 @@ class Database {
                 } else {
                     console.log(`✅ נמצאו ${rows.length} תוצאות`);
                     // המרת JSON strings חזרה למערכים
-                    const results = rows.map(row => ({
+                    const results = rows.map((row) => ({
                         ...row,
-                        tags: JSON.parse(row.tags || '[]')
+                        tags: JSON.parse(row.tags || '[]'),
                     }));
                     resolve(results);
                 }
@@ -364,10 +411,10 @@ class Database {
     // חיפוש מודעות (FTS5)
     searchPosts(query, filters = {}) {
         console.log(`🔍 searchPosts נקראת עם query: "${query}", filters:`, filters);
-        
+
         return new Promise((resolve, reject) => {
             let sql, params;
-            
+
             if (query && query.trim()) {
                 // חיפוש טקסט חופשי עם FTS5 - מסנן מודעות פרטיות
                 sql = `
@@ -380,12 +427,11 @@ class Database {
                 `;
                 params = [query];
                 console.log(`📊 משתמש ב-FTS5 לחיפוש: "${query}"`);
-                
+
                 // הוספת סינונים
                 if (filters.pricingMode) {
                     sql += ` AND p.pricing_mode IN ('${filters.pricingMode}', 'both')`;
                 }
-                
             } else {
                 // אם אין חיפוש טקסט, הצג את כל המודעות הציבוריות
                 sql = `
@@ -397,17 +443,17 @@ class Database {
                 `;
                 params = [];
                 console.log('📊 אין query - מחזיר את כל המודעות הציבוריות');
-                
+
                 if (filters.pricingMode) {
                     sql += ` AND p.pricing_mode IN ('${filters.pricingMode}', 'both')`;
                 }
             }
-            
+
             sql += ` ORDER BY p.created_at DESC LIMIT 20`;
-            
+
             console.log('🔧 SQL query:', sql.replace(/\s+/g, ' ').trim());
             console.log('🔧 Parameters:', params);
-            
+
             this.db.all(sql, params, (err, rows) => {
                 if (err) {
                     console.error('❌ שגיאת מסד נתונים בחיפוש:', err);
@@ -415,9 +461,9 @@ class Database {
                 } else {
                     console.log(`✅ נמצאו ${rows.length} תוצאות`);
                     // המרת JSON strings חזרה למערכים
-                    const results = rows.map(row => ({
+                    const results = rows.map((row) => ({
                         ...row,
-                        tags: JSON.parse(row.tags || '[]')
+                        tags: JSON.parse(row.tags || '[]'),
                     }));
                     resolve(results);
                 }
@@ -433,22 +479,26 @@ class Database {
                 WHERE user_id = ?
                 ORDER BY created_at DESC
             `;
-            
+
             this.db.all(sql, [userId], (err, rows) => {
                 if (err) {
                     console.error('[DEBUG] Error getting user posts:', err);
                     reject(err);
                 } else {
-                    console.log(`[DEBUG] getUserPosts for user ${userId} - found ${rows?.length || 0} posts`);
+                    console.log(
+                        `[DEBUG] getUserPosts for user ${userId} - found ${rows?.length || 0} posts`
+                    );
                     if (rows) {
-                        rows.forEach(post => {
-                            console.log(`[DEBUG] Post ${post.id}: active=${post.is_active}, title="${post.title}"`);
+                        rows.forEach((post) => {
+                            console.log(
+                                `[DEBUG] Post ${post.id}: active=${post.is_active}, title="${post.title}"`
+                            );
                         });
                     }
-                    
-                    const results = (rows || []).map(row => ({
+
+                    const results = (rows || []).map((row) => ({
                         ...row,
-                        tags: JSON.parse(row.tags || '[]')
+                        tags: JSON.parse(row.tags || '[]'),
                     }));
                     resolve(results);
                 }
@@ -463,9 +513,9 @@ class Database {
                 DELETE FROM posts 
                 WHERE id = ? AND user_id = ?
             `;
-            this.db.run(sql, [postId, userId], function(err) {
-                if (err) reject(err);
-                else resolve(this.changes > 0);
+            this.db.run(sql, [postId, userId], function (err) {
+                if (err) {reject(err);}
+                else {resolve(this.changes > 0);}
             });
         });
     }
@@ -477,9 +527,9 @@ class Database {
                 DELETE FROM posts 
                 WHERE id = ?
             `;
-            this.db.run(sql, [postId], function(err) {
-                if (err) reject(err);
-                else resolve(this.changes > 0);
+            this.db.run(sql, [postId], function (err) {
+                if (err) {reject(err);}
+                else {resolve(this.changes > 0);}
             });
         });
     }
@@ -488,43 +538,51 @@ class Database {
     togglePost(postId, userId) {
         return new Promise((resolve, reject) => {
             console.log(`[DEBUG] togglePost called - postId: ${postId}, userId: ${userId}`);
-            
+
             const db = this.db; // שומר את הרפרנס
-            
+
             // קודם נבדוק מה המצב הנוכחי
-            db.get('SELECT is_active FROM posts WHERE id = ? AND user_id = ?', [postId, userId], (err, row) => {
-                if (err) {
-                    console.error('[DEBUG] Error checking post status:', err);
-                    reject(err);
-                    return;
-                }
-                
-                console.log(`[DEBUG] Current post status:`, row);
-                
-                // עכשיו נעדכן
-                const sql = `
+            db.get(
+                'SELECT is_active FROM posts WHERE id = ? AND user_id = ?',
+                [postId, userId],
+                (err, row) => {
+                    if (err) {
+                        console.error('[DEBUG] Error checking post status:', err);
+                        reject(err);
+                        return;
+                    }
+
+                    console.log(`[DEBUG] Current post status:`, row);
+
+                    // עכשיו נעדכן
+                    const sql = `
                     UPDATE posts 
                     SET is_active = 1 - is_active, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ? AND user_id = ?
                 `;
-                
-                db.run(sql, [postId, userId], function(err) {
-                    if (err) {
-                        console.error('[DEBUG] Error toggling post:', err);
-                        reject(err);
-                    } else {
-                        const changes = this.changes;
-                        console.log(`[DEBUG] Toggle result - changes: ${changes}`);
-                        
-                        // בדיקה אחרי העדכון
-                        db.get('SELECT id, is_active FROM posts WHERE id = ?', [postId], (err2, row2) => {
-                            console.log(`[DEBUG] Post after toggle:`, row2);
-                        });
-                        
-                        resolve(changes > 0);
-                    }
-                });
-            });
+
+                    db.run(sql, [postId, userId], function (err) {
+                        if (err) {
+                            console.error('[DEBUG] Error toggling post:', err);
+                            reject(err);
+                        } else {
+                            const changes = this.changes;
+                            console.log(`[DEBUG] Toggle result - changes: ${changes}`);
+
+                            // בדיקה אחרי העדכון
+                            db.get(
+                                'SELECT id, is_active FROM posts WHERE id = ?',
+                                [postId],
+                                (err2, row2) => {
+                                    console.log(`[DEBUG] Post after toggle:`, row2);
+                                }
+                            );
+
+                            resolve(changes > 0);
+                        }
+                    });
+                }
+            );
         });
     }
 
@@ -538,11 +596,11 @@ class Database {
                 WHERE p.id = ?
             `;
             this.db.get(sql, [postId], (err, row) => {
-                if (err) reject(err);
+                if (err) {reject(err);}
                 else if (row) {
                     resolve({
                         ...row,
-                        tags: JSON.parse(row.tags || '[]')
+                        tags: JSON.parse(row.tags || '[]'),
                     });
                 } else {
                     resolve(null);
@@ -560,19 +618,19 @@ class Database {
                 JOIN users u ON p.user_id = u.user_id
                 WHERE p.is_active = 1
             `;
-            
+
             if (filters.pricingMode) {
                 sql += ` AND p.pricing_mode IN ('${filters.pricingMode}', 'both')`;
             }
-            
+
             sql += ` ORDER BY p.created_at DESC LIMIT ?`;
-            
+
             this.db.all(sql, [limit], (err, rows) => {
-                if (err) reject(err);
+                if (err) {reject(err);}
                 else {
-                    const results = rows.map(row => ({
+                    const results = rows.map((row) => ({
                         ...row,
-                        tags: JSON.parse(row.tags || '[]')
+                        tags: JSON.parse(row.tags || '[]'),
                     }));
                     resolve(results);
                 }
@@ -581,7 +639,7 @@ class Database {
     }
 
     // פונקציות ניהול מועדפים
-    
+
     // שמירת מודעה למועדפים
     savePost(userId, postId) {
         return new Promise((resolve, reject) => {
@@ -589,7 +647,7 @@ class Database {
                 INSERT OR IGNORE INTO saved_posts (user_id, post_id)
                 VALUES (?, ?)
             `;
-            this.db.run(sql, [userId, postId], function(err) {
+            this.db.run(sql, [userId, postId], function (err) {
                 if (err) {
                     console.error('[DEBUG] Error saving post:', err);
                     reject(err);
@@ -608,7 +666,7 @@ class Database {
                 DELETE FROM saved_posts 
                 WHERE user_id = ? AND post_id = ?
             `;
-            this.db.run(sql, [userId, postId], function(err) {
+            this.db.run(sql, [userId, postId], function (err) {
                 if (err) {
                     console.error('[DEBUG] Error unsaving post:', err);
                     reject(err);
@@ -633,7 +691,9 @@ class Database {
                     console.error('[DEBUG] Error checking if post saved:', err);
                     reject(err);
                 } else {
-                    console.log(`[DEBUG] isPostSaved - userId: ${userId}, postId: ${postId}, count: ${row.count}`);
+                    console.log(
+                        `[DEBUG] isPostSaved - userId: ${userId}, postId: ${postId}, count: ${row.count}`
+                    );
                     resolve(row.count > 0);
                 }
             });
@@ -651,8 +711,8 @@ class Database {
                 ORDER BY sp.saved_at DESC
             `;
             this.db.all(sql, [userId], (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows);
+                if (err) {reject(err);}
+                else {resolve(rows);}
             });
         });
     }
@@ -667,8 +727,8 @@ class Database {
                 WHERE sp.user_id = ? AND p.is_active = 1
             `;
             this.db.get(sql, [userId], (err, row) => {
-                if (err) reject(err);
-                else resolve(row.count);
+                if (err) {reject(err);}
+                else {resolve(row.count);}
             });
         });
     }
@@ -685,15 +745,16 @@ class Database {
                 INSERT OR IGNORE INTO keyword_alerts (user_id, keyword) 
                 VALUES (?, ?)
             `;
-            this.db.run(sql, [userId, normalizedKeyword], function(err) {
+            this.db.run(sql, [userId, normalizedKeyword], function (err) {
                 if (err) {
                     console.error('שגיאה בהוספת מילת מפתח:', err);
                     reject(err);
                 } else {
-                    resolve({ 
+                    resolve({
                         success: this.changes > 0,
                         id: this.lastID,
-                        message: this.changes > 0 ? 'מילת המפתח נוספה בהצלחה' : 'מילת המפתח כבר קיימת'
+                        message:
+                            this.changes > 0 ? 'מילת המפתח נוספה בהצלחה' : 'מילת המפתח כבר קיימת',
                     });
                 }
             });
@@ -708,14 +769,15 @@ class Database {
                 DELETE FROM keyword_alerts 
                 WHERE user_id = ? AND keyword = ?
             `;
-            this.db.run(sql, [userId, normalizedKeyword], function(err) {
+            this.db.run(sql, [userId, normalizedKeyword], function (err) {
                 if (err) {
                     console.error('שגיאה בהסרת מילת מפתח:', err);
                     reject(err);
                 } else {
-                    resolve({ 
+                    resolve({
                         success: this.changes > 0,
-                        message: this.changes > 0 ? 'מילת המפתח הוסרה בהצלחה' : 'מילת המפתח לא נמצאה'
+                        message:
+                            this.changes > 0 ? 'מילת המפתח הוסרה בהצלחה' : 'מילת המפתח לא נמצאה',
                     });
                 }
             });
@@ -749,7 +811,7 @@ class Database {
             const postText = `${postTitle} ${postDescription}`.toLowerCase();
             const tagsText = Array.isArray(postTags) ? postTags.join(' ').toLowerCase() : '';
             const fullText = `${postText} ${tagsText}`;
-            
+
             const sql = `
                 SELECT DISTINCT ka.user_id, ka.keyword
                 FROM keyword_alerts ka
@@ -762,18 +824,18 @@ class Database {
                     AND sa.keyword = ka.keyword
                 )
             `;
-            
+
             this.db.all(sql, [postId, postId], (err, rows) => {
                 if (err) {
                     console.error('שגיאה בבדיקת מילות מפתח:', err);
                     reject(err);
                 } else {
                     // סינון מילות מפתח שנמצאות בטקסט או בתגיות
-                    const matches = rows.filter(row => {
+                    const matches = rows.filter((row) => {
                         const keyword = row.keyword.toLowerCase();
                         const foundInContent = postText.includes(keyword);
                         const foundInTags = tagsText.includes(keyword);
-                        
+
                         if (foundInContent || foundInTags) {
                             // הוסף מידע על מקור ההתאמה
                             row.matchSource = foundInTags && !foundInContent ? 'tags' : 'content';
@@ -794,7 +856,7 @@ class Database {
                 INSERT OR IGNORE INTO sent_alerts (user_id, post_id, keyword) 
                 VALUES (?, ?, ?)
             `;
-            this.db.run(sql, [userId, postId, keyword], function(err) {
+            this.db.run(sql, [userId, postId, keyword], function (err) {
                 if (err) {
                     console.error('שגיאה ברישום התראה:', err);
                     reject(err);
@@ -819,7 +881,7 @@ class Database {
                     console.error('שגיאה בשליפת מילות מפתח להתראה:', err);
                     reject(err);
                 } else {
-                    resolve((rows || []).map(r => r.keyword));
+                    resolve((rows || []).map((r) => r.keyword));
                 }
             });
         });
@@ -832,7 +894,7 @@ class Database {
                 DELETE FROM sent_alerts 
                 WHERE sent_at < datetime('now', '-30 days')
             `;
-            this.db.run(sql, function(err) {
+            this.db.run(sql, function (err) {
                 if (err) {
                     console.error('שגיאה בניקוי התראות ישנות:', err);
                     reject(err);
@@ -849,12 +911,14 @@ class Database {
             try {
                 // התחל טרנזקציה
                 await new Promise((res, rej) => {
-                    this.db.run('BEGIN TRANSACTION', err => err ? rej(err) : res());
+                    this.db.run('BEGIN TRANSACTION', (err) => (err ? rej(err) : res()));
                 });
 
                 // מחק את כל מילות המפתח הקיימות
                 await new Promise((res, rej) => {
-                    this.db.run('DELETE FROM keyword_alerts WHERE user_id = ?', [userId], err => err ? rej(err) : res());
+                    this.db.run('DELETE FROM keyword_alerts WHERE user_id = ?', [userId], (err) =>
+                        err ? rej(err) : res()
+                    );
                 });
 
                 // הוסף את מילות המפתח החדשות
@@ -865,7 +929,7 @@ class Database {
                             this.db.run(
                                 'INSERT INTO keyword_alerts (user_id, keyword) VALUES (?, ?)',
                                 [userId, normalizedKeyword],
-                                err => err ? rej(err) : res()
+                                (err) => (err ? rej(err) : res())
                             );
                         });
                     }
@@ -873,7 +937,7 @@ class Database {
 
                 // סיים את הטרנזקציה
                 await new Promise((res, rej) => {
-                    this.db.run('COMMIT', err => err ? rej(err) : res());
+                    this.db.run('COMMIT', (err) => (err ? rej(err) : res()));
                 });
 
                 resolve({ success: true, count: keywords.length });
@@ -898,7 +962,7 @@ class Database {
                     state = excluded.state,
                     updated_at = CURRENT_TIMESTAMP
             `;
-            this.db.run(sql, [userId, JSON.stringify(stateObj)], function(err) {
+            this.db.run(sql, [userId, JSON.stringify(stateObj)], function (err) {
                 if (err) {
                     console.error('[DEBUG] Error setPersistentUserState:', err);
                     reject(err);
@@ -918,7 +982,7 @@ class Database {
                     console.error('[DEBUG] Error getPersistentUserState:', err);
                     reject(err);
                 } else {
-                    if (!row) return resolve(null);
+                    if (!row) {return resolve(null);}
                     try {
                         const obj = JSON.parse(row.state);
                         resolve(obj);
@@ -934,7 +998,7 @@ class Database {
     clearPersistentUserState(userId) {
         return new Promise((resolve, reject) => {
             const sql = `DELETE FROM user_states WHERE user_id = ?`;
-            this.db.run(sql, [userId], function(err) {
+            this.db.run(sql, [userId], function (err) {
                 if (err) {
                     console.error('[DEBUG] Error clearPersistentUserState:', err);
                     reject(err);
@@ -966,13 +1030,15 @@ const db = new Database();
 // אם הקובץ מורץ ישירות, אתחל את בסיס הנתונים
 if (require.main === module) {
     console.log('🔧 מאתחל בסיס נתונים...');
-    db.init().then(() => {
-        console.log('✅ בסיס הנתונים מוכן לשימוש!');
-        process.exit(0);
-    }).catch(err => {
-        console.error('❌ שגיאה באתחול:', err);
-        process.exit(1);
-    });
+    db.init()
+        .then(() => {
+            console.log('✅ בסיס הנתונים מוכן לשימוש!');
+            process.exit(0);
+        })
+        .catch((err) => {
+            console.error('❌ שגיאה באתחול:', err);
+            process.exit(1);
+        });
 }
 
 module.exports = db;

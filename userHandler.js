@@ -21,47 +21,52 @@ class UserHandler {
     async showUserPostsDetailed(chatId, userId) {
         try {
             const posts = await db.getUserPosts(userId);
-            
+
             if (posts.length === 0) {
-                await this.bot.sendMessage(chatId, config.messages.noUserPosts, keyboards.getMainKeyboard());
+                await this.bot.sendMessage(
+                    chatId,
+                    config.messages.noUserPosts,
+                    keyboards.getMainKeyboard()
+                );
                 return;
             }
 
             const e = this.emojis;
-            const activePosts = posts.filter(p => p.is_active);
-            const inactivePosts = posts.filter(p => !p.is_active);
-            
+            const activePosts = posts.filter((p) => p.is_active);
+            const inactivePosts = posts.filter((p) => !p.is_active);
+
             let summary = `📊 *סיכום המודעות שלכם:*\n\n`;
             summary += `${e ? '✅' : '•'} מודעות פעילות: ${activePosts.length}\n`;
             summary += `${e ? '⏸️' : '•'} מודעות מוקפאות: ${inactivePosts.length}\n`;
             summary += `${e ? '📈' : '•'} סה״כ: ${posts.length}/${config.content.maxPostsPerUser}\n\n`;
             summary += `בחרו מודעה לניהול:`;
 
-            await this.bot.sendMessage(chatId, summary, { 
+            await this.bot.sendMessage(chatId, summary, {
                 parse_mode: 'Markdown',
-                ...keyboards.getMainKeyboard()
+                ...keyboards.getMainKeyboard(),
             });
 
             // הצגת כל מודעה עם כפתורי ניהול
-            for (const post of posts.slice(0, 10)) { // מגביל ל-10 מודעות
+            for (const post of posts.slice(0, 10)) {
+                // מגביל ל-10 מודעות
                 const message = utils.formatPostPreview(post);
                 const keyboard = keyboards.getUserPostActionsKeyboard(post.id, post.is_active);
-                
+
                 await this.bot.sendMessage(chatId, message, {
                     parse_mode: 'Markdown',
-                    ...keyboard
+                    ...keyboard,
                 });
-                
+
                 // השהייה קטנה למניעת spam
                 await utils.sleep(100);
             }
 
             if (posts.length > 10) {
-                await this.bot.sendMessage(chatId, 
+                await this.bot.sendMessage(
+                    chatId,
                     `${e ? '📄' : '•'} מוצגות 10 מודעות ראשונות. השתמשו בחיפוש כדי למצוא מודעה ספציפית.`
                 );
             }
-
         } catch (error) {
             utils.logError(error, 'showUserPostsDetailed');
             await this.bot.sendMessage(chatId, config.messages.error);
@@ -78,12 +83,12 @@ class UserHandler {
         try {
             const post = await db.getPost(postId);
             console.log('[DEBUG] Post found:', !!post, 'User match:', post?.user_id === userId);
-            
+
             if (!post || post.user_id !== userId) {
                 await this.bot.answerCallbackQuery(callbackQuery.id, {
-                text: `${this.emojis ? '❌' : ''} המודעה לא קיימת במערכת. ייתכן שנמחקה.`,
-                show_alert: true
-            });
+                    text: `${this.emojis ? '❌' : ''} המודעה לא קיימת במערכת. ייתכן שנמחקה.`,
+                    show_alert: true,
+                });
                 return;
             }
 
@@ -95,12 +100,11 @@ class UserHandler {
                     chat_id: chatId,
                     message_id: callbackQuery.message.message_id,
                     parse_mode: 'Markdown',
-                    ...keyboards.getEditConfirmKeyboard(postId)
+                    ...keyboards.getEditConfirmKeyboard(postId),
                 }
             );
 
             await this.bot.answerCallbackQuery(callbackQuery.id);
-
         } catch (error) {
             utils.logError(error, 'startEditingPost');
             await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
@@ -111,7 +115,7 @@ class UserHandler {
         const chatId = callbackQuery.message.chat.id;
         const userId = callbackQuery.from.id;
         const data = callbackQuery.data;
-        
+
         // Parse field and postId from callback data like "edit_title_123" or "edit_desc_123"
         let field, postId;
         if (data.startsWith('edit_title_')) {
@@ -135,19 +139,19 @@ class UserHandler {
         } else {
             await this.bot.answerCallbackQuery(callbackQuery.id, {
                 text: 'שדה עריכה לא מוכר',
-                show_alert: false
+                show_alert: false,
             });
             return;
         }
 
         try {
             const post = await db.getPost(postId);
-            
+
             if (!post || post.user_id !== userId) {
                 await this.bot.answerCallbackQuery(callbackQuery.id, {
-                text: 'אין הרשאה',
-                show_alert: false
-            });
+                    text: 'אין הרשאה',
+                    show_alert: false,
+                });
                 return;
             }
 
@@ -159,27 +163,29 @@ class UserHandler {
                 field,
                 originalPost: post,
                 messageId: callbackQuery.message.message_id,
-                startTime: Date.now()
+                startTime: Date.now(),
             });
 
             // בקשת קלט מהמשתמש לפי שדה
             const fieldInstructions = this.getEditInstructions(field, post);
-            
+
             await this.bot.editMessageText(fieldInstructions, {
                 chat_id: chatId,
                 message_id: callbackQuery.message.message_id,
-                parse_mode: 'Markdown'
+                parse_mode: 'Markdown',
             });
 
             await this.bot.answerCallbackQuery(callbackQuery.id);
 
             // ניקוי סשן עריכה אחרי timeout
-            setTimeout(() => {
-                if (this.editingSessions.has(sessionId)) {
-                    this.editingSessions.delete(sessionId);
-                }
-            }, config.security.userStateMaxAge * 60 * 1000);
-
+            setTimeout(
+                () => {
+                    if (this.editingSessions.has(sessionId)) {
+                        this.editingSessions.delete(sessionId);
+                    }
+                },
+                config.security.userStateMaxAge * 60 * 1000
+            );
         } catch (error) {
             utils.logError(error, 'handleEditField');
             await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
@@ -188,16 +194,16 @@ class UserHandler {
 
     getEditInstructions(field, post) {
         const e = this.emojis;
-        
+
         const pricingOptionsText = this.getPricingOptionsText(post.pricing_mode);
-        
+
         const instructions = {
             title: `${e ? '📝' : ''} *עריכת כותרת*\n\nכותרת נוכחית: "${post.title}"\n\nהקלידו כותרת חדשה:`,
             desc: `${e ? '📄' : ''} *עריכת תיאור*\n\nתיאור נוכחי: "${utils.truncateText(post.description, 200)}"\n\nהקלידו תיאור חדש:`,
             pricing: `${e ? '💰' : ''} *עריכת מצב תמחור*\n\nמצב נוכחי: ${config.getPricingStyle(post.pricing_mode).name}\n\nבחרו מצב חדש: ${pricingOptionsText}`,
             tags: `${e ? '🏷️' : ''} *עריכת תגיות*\n\nתגיות נוכחיות: ${utils.formatTags(post.tags)}\n\nהקלידו תגיות חדשות (מופרדות בפסיק):`,
             links: `${e ? '🔗' : ''} *עריכת קישורים*\n\nקישורים נוכחיים: ${post.portfolio_links || 'אין'}\n\nהקלידו קישורים חדשים:`,
-            contact: `${e ? '📞' : ''} *עריכת פרטי קשר*\n\nפרטי קשר נוכחיים: "${post.contact_info}"\n\nהקלידו פרטי קשר חדשים:`
+            contact: `${e ? '📞' : ''} *עריכת פרטי קשר*\n\nפרטי קשר נוכחיים: "${post.contact_info}"\n\nהקלידו פרטי קשר חדשים:`,
         };
 
         return instructions[field] || 'עריכה לא מוכרת';
@@ -205,8 +211,8 @@ class UserHandler {
 
     getPricingOptionsText(currentMode) {
         const modes = ['barter', 'payment', 'both', 'free'];
-        const others = modes.filter(mode => mode !== currentMode);
-        return others.map(mode => config.getPricingStyle(mode).name).join(' / ');
+        const others = modes.filter((mode) => mode !== currentMode);
+        return others.map((mode) => config.getPricingStyle(mode).name).join(' / ');
     }
 
     async processEditInput(msg) {
@@ -229,9 +235,10 @@ class UserHandler {
 
         try {
             const validation = this.validateEditInput(activeSession.field, text);
-            
+
             if (!validation.isValid) {
-                await this.bot.sendMessage(chatId, 
+                await this.bot.sendMessage(
+                    chatId,
                     `${this.emojis ? '❌' : ''} ${validation.error}\n\nנסו שוב:`,
                     keyboards.removeInlineKeyboard()
                 );
@@ -243,25 +250,25 @@ class UserHandler {
 
             // הודעת הצלחה
             const e = this.emojis;
-            await this.bot.sendMessage(chatId, 
+            await this.bot.sendMessage(
+                chatId,
                 `${e ? '✅' : ''} השדה עודכן בהצלחה!\n\n*הערך החדש:* ${validation.formatted || validation.value}`,
                 {
                     parse_mode: 'Markdown',
-                    ...keyboards.getMainKeyboard()
+                    ...keyboards.getMainKeyboard(),
                 }
             );
 
             // ניקוי הסשן
             this.editingSessions.delete(activeSession.sessionId);
-            
-            utils.logAction(userId, 'edit_post_field', { 
-                postId: activeSession.postId, 
+
+            utils.logAction(userId, 'edit_post_field', {
+                postId: activeSession.postId,
                 field: activeSession.field,
-                newValue: validation.value
+                newValue: validation.value,
             });
 
             return true;
-
         } catch (error) {
             utils.logError(error, 'processEditInput');
             await this.bot.sendMessage(chatId, config.messages.error);
@@ -277,7 +284,10 @@ class UserHandler {
                     return { isValid: false, error: 'כותרת חייבת להכיל לפחות 3 תווים' };
                 }
                 if (input.length > config.content.maxTitleLength) {
-                    return { isValid: false, error: `כותרת ארוכה מדי (מקסימום ${config.content.maxTitleLength} תווים)` };
+                    return {
+                        isValid: false,
+                        error: `כותרת ארוכה מדי (מקסימום ${config.content.maxTitleLength} תווים)`,
+                    };
                 }
                 return { isValid: true, value: utils.sanitizeText(input) };
 
@@ -286,60 +296,72 @@ class UserHandler {
                     return { isValid: false, error: 'תיאור חייב להכיל לפחות 10 תווים' };
                 }
                 if (input.length > config.content.maxDescriptionLength) {
-                    return { isValid: false, error: `תיאור ארוך מדי (מקסימום ${config.content.maxDescriptionLength} תווים)` };
+                    return {
+                        isValid: false,
+                        error: `תיאור ארוך מדי (מקסימום ${config.content.maxDescriptionLength} תווים)`,
+                    };
                 }
                 return { isValid: true, value: utils.sanitizeText(input) };
 
-            case 'pricing':
+            case 'pricing': {
                 // טיפול במצב תמחור
                 const lowerInput = input.trim().toLowerCase();
                 let pricingMode = null;
-                
+
                 // בדיקה של האפשרויות השונות
                 if (lowerInput === 'בארטר' || lowerInput === 'החלפה' || lowerInput === 'barter') {
                     pricingMode = 'barter';
-                } else if (lowerInput === 'תשלום' || lowerInput === 'כסף' || lowerInput === 'payment') {
+                } else if (
+                    lowerInput === 'תשלום' ||
+                    lowerInput === 'כסף' ||
+                    lowerInput === 'payment'
+                ) {
                     pricingMode = 'payment';
-                } else if (lowerInput === 'בארטר או תשלום' || lowerInput === 'שניהם' || lowerInput === 'both') {
+                } else if (
+                    lowerInput === 'בארטר או תשלום' ||
+                    lowerInput === 'שניהם' ||
+                    lowerInput === 'both'
+                ) {
                     pricingMode = 'both';
                 } else if (lowerInput === 'חינם' || lowerInput === 'free') {
                     pricingMode = 'free';
                 } else {
-                    return { 
-                        isValid: false, 
-                        error: 'מצב תמחור לא תקין. האפשרויות הן: בארטר, תשלום, בארטר או תשלום, חינם' 
+                    return {
+                        isValid: false,
+                        error: 'מצב תמחור לא תקין. האפשרויות הן: בארטר, תשלום, בארטר או תשלום, חינם',
                     };
                 }
-                
+
                 const pricingStyle = config.getPricingStyle(pricingMode);
-                return { 
-                    isValid: true, 
+                return {
+                    isValid: true,
                     value: pricingMode,
-                    formatted: pricingStyle.name
+                    formatted: pricingStyle.name,
                 };
-
-            case 'tags':
+            }
+            case 'tags': {
                 const tags = utils.validateTags(input);
-                return { 
-                    isValid: true, 
+                return {
+                    isValid: true,
                     value: tags,
-                    formatted: utils.formatTags(tags)
+                    formatted: utils.formatTags(tags),
                 };
-
-            case 'links':
+            }
+            case 'links': {
                 const linkValidation = utils.validateLinks(input);
-                return { 
-                    isValid: true, 
+                return {
+                    isValid: true,
                     value: linkValidation.links.join('\n'),
-                    formatted: utils.formatLinks(linkValidation.links)
+                    formatted: utils.formatLinks(linkValidation.links),
                 };
-
-            case 'contact':
+            }
+            case 'contact': {
                 const contactValidation = utils.validateContact(input);
                 if (!contactValidation.isValid) {
                     return { isValid: false, error: contactValidation.error };
                 }
                 return { isValid: true, value: contactValidation.formatted };
+            }
 
             default:
                 return { isValid: false, error: 'שדה לא מוכר' };
@@ -354,7 +376,7 @@ class UserHandler {
                 pricing: 'pricing_mode',
                 tags: 'tags',
                 links: 'portfolio_links',
-                contact: 'contact_info'
+                contact: 'contact_info',
             };
 
             const dbField = fieldMap[field];
@@ -364,16 +386,16 @@ class UserHandler {
             }
 
             const processedValue = field === 'tags' ? JSON.stringify(value) : value;
-            
+
             const sql = `
                 UPDATE posts 
                 SET ${dbField} = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             `;
 
-            db.db.run(sql, [processedValue, postId], function(err) {
-                if (err) reject(err);
-                else resolve(this.changes > 0);
+            db.db.run(sql, [processedValue, postId], function (err) {
+                if (err) {reject(err);}
+                else {resolve(this.changes > 0);}
             });
         });
     }
@@ -387,44 +409,48 @@ class UserHandler {
 
         try {
             const post = await db.getPost(postId);
-            console.log('[DEBUG] Toggle - Post found:', !!post, 'User match:', post?.user_id === userId);
-            
+            console.log(
+                '[DEBUG] Toggle - Post found:',
+                !!post,
+                'User match:',
+                post?.user_id === userId
+            );
+
             if (!post || post.user_id !== userId) {
                 await this.bot.answerCallbackQuery(callbackQuery.id, {
-                text: 'אין הרשאה',
-                show_alert: false
-            });
+                    text: 'אין הרשאה',
+                    show_alert: false,
+                });
                 return;
             }
 
             const success = await db.togglePost(postId, userId);
-            
+
             if (success) {
                 // הסטטוס החדש הוא ההפך מהסטטוס הנוכחי
                 const newIsActive = !post.is_active;
                 const newStatus = newIsActive ? 'הופעלה' : 'הוקפאה';
                 const e = this.emojis;
-                
+
                 await this.bot.answerCallbackQuery(callbackQuery.id, {
                     text: `${e ? '✅' : ''} המודעה ${newStatus} בהצלחה`,
-                    show_alert: false
+                    show_alert: false,
                 });
 
                 // עדכון הכפתורים עם הסטטוס החדש
                 const newKeyboard = keyboards.getUserPostActionsKeyboard(postId, newIsActive);
                 await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
                     chat_id: chatId,
-                    message_id: callbackQuery.message.message_id
+                    message_id: callbackQuery.message.message_id,
                 });
 
                 utils.logAction(userId, 'toggle_post', { postId, newStatus: newIsActive });
             } else {
                 await this.bot.answerCallbackQuery(callbackQuery.id, {
                     text: 'שגיאה בעדכון המודעה',
-                    show_alert: true
+                    show_alert: true,
                 });
             }
-
         } catch (error) {
             utils.logError(error, 'togglePostStatus');
             await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
@@ -440,17 +466,18 @@ class UserHandler {
         try {
             // קבלת פרטי המודעה לאישור
             const post = await db.getPost(postId);
-            
+
             if (!post || post.user_id !== userId) {
                 await this.bot.answerCallbackQuery(callbackQuery.id, {
-                text: 'אין הרשאה למחוק מודעה זו',
-                show_alert: false
-            });
+                    text: 'אין הרשאה למחוק מודעה זו',
+                    show_alert: false,
+                });
                 return;
             }
 
             const e = this.emojis;
-            const confirmMessage = `${e ? '⚠️' : ''} *אישור מחיקה*\n\n` +
+            const confirmMessage =
+                `${e ? '⚠️' : ''} *אישור מחיקה*\n\n` +
                 `האם אתם בטוחים שברצונכם למחוק את המודעה:\n` +
                 `*"${utils.truncateText(post.title, 50)}"*?\n\n` +
                 `${e ? '🔥' : '•'} הפעולה בלתי הפיכה!\n` +
@@ -460,14 +487,13 @@ class UserHandler {
                 chat_id: chatId,
                 message_id: callbackQuery.message.message_id,
                 parse_mode: 'Markdown',
-                ...keyboards.getDeleteConfirmKeyboard(postId)
+                ...keyboards.getDeleteConfirmKeyboard(postId),
             });
 
             await this.bot.answerCallbackQuery(callbackQuery.id, {
                 text: 'נדרש אישור למחיקה',
-                show_alert: false
+                show_alert: false,
             });
-            
         } catch (error) {
             utils.logError(error, 'confirmDeletePost');
             await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
@@ -481,17 +507,17 @@ class UserHandler {
 
         try {
             const post = await db.getPost(postId);
-            
+
             if (!post || post.user_id !== userId) {
                 await this.bot.answerCallbackQuery(callbackQuery.id, {
-                text: 'אין הרשאה',
-                show_alert: false
-            });
+                    text: 'אין הרשאה',
+                    show_alert: false,
+                });
                 return;
             }
 
             const success = await db.deletePost(postId, userId);
-            
+
             if (success) {
                 const e = this.emojis;
                 await this.bot.editMessageText(
@@ -499,18 +525,17 @@ class UserHandler {
                     {
                         chat_id: chatId,
                         message_id: callbackQuery.message.message_id,
-                        parse_mode: 'Markdown'
+                        parse_mode: 'Markdown',
                     }
                 );
 
                 utils.logAction(userId, 'delete_post', { postId, title: post.title });
             } else {
                 await this.bot.answerCallbackQuery(callbackQuery.id, {
-                text: 'שגיאה במחיקת המודעה',
-                show_alert: false
-            });
+                    text: 'שגיאה במחיקת המודעה',
+                    show_alert: false,
+                });
             }
-
         } catch (error) {
             utils.logError(error, 'executeDeletePost');
             await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
@@ -525,12 +550,12 @@ class UserHandler {
 
         try {
             const post = await db.getPost(postId);
-            
+
             if (!post) {
                 await this.bot.answerCallbackQuery(callbackQuery.id, {
-                text: 'המודעה לא נמצאה',
-                show_alert: false
-            });
+                    text: 'המודעה לא נמצאה',
+                    show_alert: false,
+                });
                 return;
             }
 
@@ -545,16 +570,15 @@ class UserHandler {
                 chat_id: chatId,
                 message_id: callbackQuery.message.message_id,
                 parse_mode: 'Markdown',
-                ...keyboard
+                ...keyboard,
             });
 
             await this.bot.answerCallbackQuery(callbackQuery.id, {
                 text: `${this.emojis ? '📞' : ''} פרטי קשר נחשפו`,
-                show_alert: false
+                show_alert: false,
             });
 
             utils.logAction(userId, 'view_contact', { postId, postOwner: post.user_id });
-
         } catch (error) {
             utils.logError(error, 'handleContactRequest');
             await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
@@ -572,23 +596,23 @@ class UserHandler {
             // בדיקה אם המודעה כבר שמורה
             const isSaved = await db.isPostSaved(userId, postId);
             console.log('[DEBUG] Save - Post is already saved:', isSaved);
-            
+
             if (isSaved) {
                 // הסרה מהמועדפים
                 await db.unsavePost(userId, postId);
-                
+
                 // הודעה קופצת
                 try {
                     console.log('[DEBUG] Trying to show unsave alert...');
                     await this.bot.answerCallbackQuery(callbackQuery.id, {
                         text: `💔 המודעה הוסרה מהמועדפים`,
-                        show_alert: false
+                        show_alert: false,
                     });
                     console.log('[DEBUG] Unsave alert shown successfully');
                 } catch (alertErr) {
                     console.error('[DEBUG] Error showing unsave alert:', alertErr.message);
                 }
-                
+
                 // עדכון כפתור שמירה בהודעה
                 try {
                     const isFromAlert = callbackQuery.data.includes('_from_alert');
@@ -597,39 +621,63 @@ class UserHandler {
                         const isAdmin = config.isAdmin(userId);
                         const inline = [
                             [
-                                { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
-                                { text: `${e ? '⭐ ' : ''}שמור`, callback_data: `save_${postId}_from_alert` }
+                                {
+                                    text: `${e ? '📞 ' : ''}צור קשר`,
+                                    callback_data: `contact_${postId}`,
+                                },
+                                {
+                                    text: `${e ? '⭐ ' : ''}שמור`,
+                                    callback_data: `save_${postId}_from_alert`,
+                                },
                             ],
                             [
-                                { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
-                                { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
-                            ]
+                                {
+                                    text: `${e ? '🚨 ' : ''}דווח`,
+                                    callback_data: `report_${postId}`,
+                                },
+                                { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` },
+                            ],
                         ];
                         if (isAdmin) {
                             inline.push([
-                                { text: `${e ? '🗑️ ' : ''}מחק מודעה`, callback_data: `admin_delete_${postId}` },
-                                { text: `${e ? '🔙 ' : ''}חזרה`, callback_data: `alert_back_${postId}` }
+                                {
+                                    text: `${e ? '🗑️ ' : ''}מחק מודעה`,
+                                    callback_data: `admin_delete_${postId}`,
+                                },
+                                {
+                                    text: `${e ? '🔙 ' : ''}חזרה`,
+                                    callback_data: `alert_back_${postId}`,
+                                },
                             ]);
                         } else {
-                            inline.push([{ text: `${e ? '🔙 ' : ''}חזרה`, callback_data: `alert_back_${postId}` }]);
+                            inline.push([
+                                {
+                                    text: `${e ? '🔙 ' : ''}חזרה`,
+                                    callback_data: `alert_back_${postId}`,
+                                },
+                            ]);
                         }
                         const replyMarkup = { inline_keyboard: inline };
                         await this.bot.editMessageReplyMarkup(replyMarkup, {
                             chat_id: chatId,
-                            message_id: callbackQuery.message.message_id
+                            message_id: callbackQuery.message.message_id,
                         });
                     } else {
                         const isAdmin = config.isAdmin(userId);
-                        const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, false, isAdmin);
+                        const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(
+                            postId,
+                            false,
+                            isAdmin
+                        );
                         await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
                             chat_id: chatId,
-                            message_id: callbackQuery.message.message_id
+                            message_id: callbackQuery.message.message_id,
                         });
                     }
                 } catch (kbErr) {
                     console.error('[DEBUG] Error updating save button (unsave):', kbErr.message);
                 }
-                
+
                 utils.logAction(userId, 'unsave_post', { postId });
             } else {
                 // הוספה למועדפים
@@ -640,13 +688,13 @@ class UserHandler {
                         console.log('[DEBUG] Trying to show save alert...');
                         await this.bot.answerCallbackQuery(callbackQuery.id, {
                             text: `⭐ המודעה נשמרה למועדפים!`,
-                            show_alert: false
+                            show_alert: false,
                         });
                         console.log('[DEBUG] Save alert shown successfully');
                     } catch (alertErr) {
                         console.error('[DEBUG] Error showing save alert:', alertErr.message);
                     }
-                    
+
                     // עדכון כפתור שמירה בהודעה
                     try {
                         const isFromAlert = callbackQuery.data.includes('_from_alert');
@@ -655,50 +703,80 @@ class UserHandler {
                             const isAdmin = config.isAdmin(userId);
                             const inline = [
                                 [
-                                    { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
-                                    { text: `${e ? '💔 ' : ''}הסר ממועדפים`, callback_data: `save_${postId}_from_alert` }
+                                    {
+                                        text: `${e ? '📞 ' : ''}צור קשר`,
+                                        callback_data: `contact_${postId}`,
+                                    },
+                                    {
+                                        text: `${e ? '💔 ' : ''}הסר ממועדפים`,
+                                        callback_data: `save_${postId}_from_alert`,
+                                    },
                                 ],
                                 [
-                                    { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
-                                    { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
-                                ]
+                                    {
+                                        text: `${e ? '🚨 ' : ''}דווח`,
+                                        callback_data: `report_${postId}`,
+                                    },
+                                    {
+                                        text: `${e ? '📤 ' : ''}שתף`,
+                                        callback_data: `share_${postId}`,
+                                    },
+                                ],
                             ];
                             if (isAdmin) {
                                 inline.push([
-                                    { text: `${e ? '🗑️ ' : ''}מחק מודעה`, callback_data: `admin_delete_${postId}` },
-                                    { text: `${e ? '🔙 ' : ''}חזרה`, callback_data: `alert_back_${postId}` }
+                                    {
+                                        text: `${e ? '🗑️ ' : ''}מחק מודעה`,
+                                        callback_data: `admin_delete_${postId}`,
+                                    },
+                                    {
+                                        text: `${e ? '🔙 ' : ''}חזרה`,
+                                        callback_data: `alert_back_${postId}`,
+                                    },
                                 ]);
                             } else {
-                                inline.push([{ text: `${e ? '🔙 ' : ''}חזרה`, callback_data: `alert_back_${postId}` }]);
+                                inline.push([
+                                    {
+                                        text: `${e ? '🔙 ' : ''}חזרה`,
+                                        callback_data: `alert_back_${postId}`,
+                                    },
+                                ]);
                             }
                             const replyMarkup = { inline_keyboard: inline };
                             await this.bot.editMessageReplyMarkup(replyMarkup, {
                                 chat_id: chatId,
-                                message_id: callbackQuery.message.message_id
+                                message_id: callbackQuery.message.message_id,
                             });
                         } else {
                             const isAdmin = config.isAdmin(userId);
-                            const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, true, isAdmin);
+                            const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(
+                                postId,
+                                true,
+                                isAdmin
+                            );
                             await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
                                 chat_id: chatId,
-                                message_id: callbackQuery.message.message_id
+                                message_id: callbackQuery.message.message_id,
                             });
                         }
                     } catch (kbErr) {
                         console.error('[DEBUG] Error updating save button (save):', kbErr.message);
                     }
-                    
+
                     utils.logAction(userId, 'save_post', { postId });
                 } else {
                     try {
                         await this.bot.answerCallbackQuery(callbackQuery.id, {
                             text: `⚠️ המודעה כבר שמורה במועדפים`,
-                            show_alert: false
+                            show_alert: false,
                         });
                     } catch (alertErr) {
-                        console.error('[DEBUG] Error showing already saved alert:', alertErr.message);
+                        console.error(
+                            '[DEBUG] Error showing already saved alert:',
+                            alertErr.message
+                        );
                     }
-                    
+
                     // וודא שהכפתור מציג מצב "שמורה"
                     try {
                         const isFromAlert = callbackQuery.data.includes('_from_alert');
@@ -707,49 +785,78 @@ class UserHandler {
                             const isAdmin = config.isAdmin(userId);
                             const inline = [
                                 [
-                                    { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
-                                    { text: `${e ? '💔 ' : ''}הסר ממועדפים`, callback_data: `save_${postId}_from_alert` }
+                                    {
+                                        text: `${e ? '📞 ' : ''}צור קשר`,
+                                        callback_data: `contact_${postId}`,
+                                    },
+                                    {
+                                        text: `${e ? '💔 ' : ''}הסר ממועדפים`,
+                                        callback_data: `save_${postId}_from_alert`,
+                                    },
                                 ],
                                 [
-                                    { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
-                                    { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
-                                ]
+                                    {
+                                        text: `${e ? '🚨 ' : ''}דווח`,
+                                        callback_data: `report_${postId}`,
+                                    },
+                                    {
+                                        text: `${e ? '📤 ' : ''}שתף`,
+                                        callback_data: `share_${postId}`,
+                                    },
+                                ],
                             ];
                             if (isAdmin) {
                                 inline.push([
-                                    { text: `${e ? '🗑️ ' : ''}מחק מודעה`, callback_data: `admin_delete_${postId}` },
-                                    { text: `${e ? '🔙 ' : ''}חזרה`, callback_data: `alert_back_${postId}` }
+                                    {
+                                        text: `${e ? '🗑️ ' : ''}מחק מודעה`,
+                                        callback_data: `admin_delete_${postId}`,
+                                    },
+                                    {
+                                        text: `${e ? '🔙 ' : ''}חזרה`,
+                                        callback_data: `alert_back_${postId}`,
+                                    },
                                 ]);
                             } else {
-                                inline.push([{ text: `${e ? '🔙 ' : ''}חזרה`, callback_data: `alert_back_${postId}` }]);
+                                inline.push([
+                                    {
+                                        text: `${e ? '🔙 ' : ''}חזרה`,
+                                        callback_data: `alert_back_${postId}`,
+                                    },
+                                ]);
                             }
                             const replyMarkup = { inline_keyboard: inline };
                             await this.bot.editMessageReplyMarkup(replyMarkup, {
                                 chat_id: chatId,
-                                message_id: callbackQuery.message.message_id
+                                message_id: callbackQuery.message.message_id,
                             });
                         } else {
                             const isAdmin = config.isAdmin(userId);
-                            const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, true, isAdmin);
+                            const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(
+                                postId,
+                                true,
+                                isAdmin
+                            );
                             await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
                                 chat_id: chatId,
-                                message_id: callbackQuery.message.message_id
+                                message_id: callbackQuery.message.message_id,
                             });
                         }
                     } catch (kbErr) {
-                        console.error('[DEBUG] Error updating save button (already saved):', kbErr.message);
+                        console.error(
+                            '[DEBUG] Error updating save button (already saved):',
+                            kbErr.message
+                        );
                     }
                 }
             }
-            
+
             // עדכון tracking
             this.trackInteraction(userId, postId, isSaved ? 'unsave' : 'save');
-
         } catch (error) {
             utils.logError(error, 'handleSavePost');
             await this.bot.answerCallbackQuery(callbackQuery.id, {
                 text: '❌ שגיאה בשמירת המודעה',
-                show_alert: true
+                show_alert: true,
             });
         }
     }
@@ -758,14 +865,15 @@ class UserHandler {
     async showSavedPosts(chatId, userId) {
         try {
             const savedPosts = await db.getSavedPosts(userId);
-            
+
             if (savedPosts.length === 0) {
-                await this.bot.sendMessage(chatId, 
+                await this.bot.sendMessage(
+                    chatId,
                     `${this.emojis ? '⭐' : ''} המועדפים שלכם\n\nעדיין לא שמרתם מודעות למועדפים.\n\nכדי לשמור מודעה, לחצו על כפתור "שמור" בכל מודעה שמעניינת אתכם.`,
-                    { 
+                    {
                         // לא משתמשים ב-Markdown כי זה גורם לבעיות
                         // parse_mode: 'Markdown',
-                        ...keyboards.getMainKeyboard()
+                        ...keyboards.getMainKeyboard(),
                     }
                 );
                 return;
@@ -776,14 +884,15 @@ class UserHandler {
 
             // הצגת 10 מודעות ראשונות
             const displayPosts = savedPosts.slice(0, 10);
-            
+
             for (const post of displayPosts) {
                 const pricingStyle = config.getPricingStyle(post.pricing_mode);
                 const savedDate = new Date(post.saved_at).toLocaleDateString('he-IL');
-                
+
                 // מנקה את הכותרת מתווים בעייתיים
+                // eslint-disable-next-line no-useless-escape
                 const cleanTitle = post.title.replace(/[_*\[\]()~`>#+\-=|{}.!\\]/g, '');
-                
+
                 message += `${e ? '📌' : '•'} ${cleanTitle}\n`;
                 message += `${e ? '💰' : ''} ${pricingStyle.name}\n`;
                 message += `${e ? '📅' : ''} נשמר ב: ${savedDate}\n`;
@@ -797,9 +906,8 @@ class UserHandler {
             await this.bot.sendMessage(chatId, message, {
                 // לא משתמשים ב-Markdown כי זה גורם לבעיות
                 // parse_mode: 'Markdown',
-                ...keyboards.getMainKeyboard()
+                ...keyboards.getMainKeyboard(),
             });
-
         } catch (error) {
             utils.logError(error, 'showSavedPosts');
             await this.bot.sendMessage(chatId, config.messages.error);
@@ -815,12 +923,12 @@ class UserHandler {
 
         try {
             const post = await db.getPost(postId);
-            
+
             if (!post) {
                 await this.bot.answerCallbackQuery(callbackQuery.id, {
-                text: 'המודעה לא נמצאה',
-                show_alert: false
-            });
+                    text: 'המודעה לא נמצאה',
+                    show_alert: false,
+                });
                 return;
             }
 
@@ -830,8 +938,9 @@ class UserHandler {
             // יצירת לינק לשיתוף
             const botUsername = (await this.bot.getMe()).username;
             const shareLink = `https://t.me/${botUsername}?start=post_${postId}`;
-            
-            const shareMessage = `${this.emojis ? '📤' : ''} *שיתוף מודעה*\n\n` +
+
+            const shareMessage =
+                `${this.emojis ? '📤' : ''} *שיתוף מודעה*\n\n` +
                 `*${post.title}*\n\n` +
                 `💰 מחיר: ${post.price}\n` +
                 `📍 איזור: ${post.location}\n\n` +
@@ -842,18 +951,17 @@ class UserHandler {
                 parse_mode: 'Markdown',
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: '↩️ חזרה למודעה', callback_data: `browse_post_${postId}` }]
-                    ]
-                }
+                        [{ text: '↩️ חזרה למודעה', callback_data: `browse_post_${postId}` }],
+                    ],
+                },
             });
 
             await this.bot.answerCallbackQuery(callbackQuery.id, {
                 text: `${this.emojis ? '📤' : ''} לינק לשיתוף נשלח!`,
-                show_alert: false
+                show_alert: false,
             });
 
             utils.logAction(userId, 'share_post', { postId });
-
         } catch (error) {
             utils.logError(error, 'handleSharePost');
             await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
@@ -871,11 +979,12 @@ class UserHandler {
             if (!this.pendingReports) {
                 this.pendingReports = new Map();
             }
-            
+
             this.pendingReports.set(userId, { postId, timestamp: Date.now() });
 
             // בקשת סיבת הדיווח
-            const reportPrompt = `${this.emojis ? '🚨' : ''} *דיווח על מודעה*\n\n` +
+            const reportPrompt =
+                `${this.emojis ? '🚨' : ''} *דיווח על מודעה*\n\n` +
                 `אנא ציין את הסיבה לדיווח:\n\n` +
                 `• תוכן לא הולם\n` +
                 `• מידע שגוי או מטעה\n` +
@@ -888,27 +997,26 @@ class UserHandler {
                 parse_mode: 'Markdown',
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: '❌ ביטול דיווח', callback_data: `cancel_report_${postId}` }]
-                    ]
-                }
+                        [{ text: '❌ ביטול דיווח', callback_data: `cancel_report_${postId}` }],
+                    ],
+                },
             });
 
             await this.bot.answerCallbackQuery(callbackQuery.id, {
                 text: 'אנא פרט את סיבת הדיווח',
-                show_alert: false
+                show_alert: false,
             });
 
             // הגדרת מצב המתנה לדיווח
             if (!this.userStates) {
                 this.userStates = new Map();
             }
-            this.userStates.set(userId, { 
-                action: 'awaiting_report_reason', 
-                postId 
+            this.userStates.set(userId, {
+                action: 'awaiting_report_reason',
+                postId,
             });
 
             utils.logAction(userId, 'start_report', { postId });
-
         } catch (error) {
             utils.logError(error, 'handleReportPost');
             await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
@@ -919,7 +1027,7 @@ class UserHandler {
     async cancelReport(callbackQuery) {
         const userId = callbackQuery.from.id;
         const chatId = callbackQuery.message.chat.id;
-        
+
         try {
             // ניקוי מצב המתנה
             if (this.userStates) {
@@ -931,14 +1039,13 @@ class UserHandler {
 
             await this.bot.editMessageText('❌ הדיווח בוטל', {
                 chat_id: chatId,
-                message_id: callbackQuery.message.message_id
+                message_id: callbackQuery.message.message_id,
             });
 
             await this.bot.answerCallbackQuery(callbackQuery.id, {
                 text: 'הדיווח בוטל',
-                show_alert: false
+                show_alert: false,
             });
-
         } catch (error) {
             utils.logError(error, 'cancelReport');
             await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
@@ -961,29 +1068,33 @@ class UserHandler {
             this.trackInteraction(userId, postId, 'report');
 
             const e = this.emojis;
-            const confirmMessage = `${e ? '✅' : ''} *הדיווח נשלח בהצלחה*\n\n` +
+            const confirmMessage =
+                `${e ? '✅' : ''} *הדיווח נשלח בהצלחה*\n\n` +
                 `המודעה המדווחת: "${post?.title || 'לא ידוע'}"\n` +
                 `סיבת הדיווח: ${reportReason}\n\n` +
                 `תודה על שמירה על איכות הקהילה!`;
 
             await this.bot.sendMessage(chatId, confirmMessage, {
                 parse_mode: 'Markdown',
-                ...keyboards.getMainKeyboard()
+                ...keyboards.getMainKeyboard(),
             });
 
             utils.logAction(userId, 'report_post', { postId, reason: reportReason });
 
             // התראה למנהלים עם סיבת הדיווח
             if (config.security.adminUserIds.length > 0) {
-                const adminMessage = `🚨 *דיווח חדש*\n\n` +
+                const adminMessage =
+                    `🚨 *דיווח חדש*\n\n` +
                     `מודעה: "${post?.title || 'לא ידוע'}"\n` +
                     `מדווח: ${userId}\n` +
                     `ID מודעה: ${postId}\n\n` +
                     `*סיבת הדיווח:*\n${reportReason}`;
-                
+
                 for (const adminId of config.security.adminUserIds) {
                     try {
-                        await this.bot.sendMessage(adminId, adminMessage, { parse_mode: 'Markdown' });
+                        await this.bot.sendMessage(adminId, adminMessage, {
+                            parse_mode: 'Markdown',
+                        });
                     } catch (adminError) {
                         // מתעלם משגיאות שליחה למנהלים
                     }
@@ -995,7 +1106,6 @@ class UserHandler {
             if (this.userStates) {
                 this.userStates.delete(userId);
             }
-
         } catch (error) {
             utils.logError(error, 'submitReport');
             await this.bot.sendMessage(chatId, config.messages.error);
@@ -1011,31 +1121,35 @@ class UserHandler {
 
         try {
             const post = await db.getPost(postId);
-            console.log('[DEBUG] Stats - Post found:', !!post, 'User match:', post?.user_id === userId);
-            
+            console.log(
+                '[DEBUG] Stats - Post found:',
+                !!post,
+                'User match:',
+                post?.user_id === userId
+            );
+
             if (!post || post.user_id !== userId) {
                 await this.bot.answerCallbackQuery(callbackQuery.id, {
-                text: 'אין הרשאה',
-                show_alert: false
-            });
+                    text: 'אין הרשאה',
+                    show_alert: false,
+                });
                 return;
             }
 
             // קבלת סטטיסטיקות
             const interactions = this.getPostInteractions(postId);
             const stats = utils.generatePostStats(post, interactions);
-            
+
             const statsMessage = `📊 *סטטיסטיקות מודעה*\n\n*כותרת:* ${post.title}\n\n${stats.summary}`;
 
             await this.bot.editMessageText(statsMessage, {
                 chat_id: chatId,
                 message_id: callbackQuery.message.message_id,
                 parse_mode: 'Markdown',
-                ...keyboards.getStatsKeyboard(postId)
+                ...keyboards.getStatsKeyboard(postId),
             });
 
             await this.bot.answerCallbackQuery(callbackQuery.id);
-
         } catch (error) {
             utils.logError(error, 'showPostStats');
             await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
@@ -1045,7 +1159,7 @@ class UserHandler {
     // 🔄 מעקב אחרי אינטראקציות
     trackInteraction(userId, postId, type) {
         const key = `${postId}`;
-        
+
         if (!this.userInteractions.has(key)) {
             this.userInteractions.set(key, {
                 views: 0,
@@ -1053,7 +1167,7 @@ class UserHandler {
                 saves: 0,
                 shares: 0,
                 reports: 0,
-                uniqueUsers: new Set()
+                uniqueUsers: new Set(),
             });
         }
 
@@ -1069,13 +1183,15 @@ class UserHandler {
 
     getPostInteractions(postId) {
         const key = `${postId}`;
-        return this.userInteractions.get(key) || {
-            views: 0,
-            contacts: 0, 
-            saves: 0,
-            shares: 0,
-            reports: 0
-        };
+        return (
+            this.userInteractions.get(key) || {
+                views: 0,
+                contacts: 0,
+                saves: 0,
+                shares: 0,
+                reports: 0,
+            }
+        );
     }
 
     // 🔧 ניקוי מערכות פנימיות
@@ -1092,10 +1208,10 @@ class UserHandler {
 
         // ניקוי אינטראקציות ישנות (שמור רק 24 שעות)
         // כאן יש לממש לוגיקה לניקוי אינטראקציות
-        
-        utils.logAction('system', 'cleanup', { 
+
+        utils.logAction('system', 'cleanup', {
             editingSessions: this.editingSessions.size,
-            interactions: this.userInteractions.size 
+            interactions: this.userInteractions.size,
         });
     }
 

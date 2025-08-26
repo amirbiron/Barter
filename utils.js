@@ -11,7 +11,7 @@ class Utils {
 
     // 📅 פונקציות זמן ותאריך
     formatDate(date, locale = 'he-IL') {
-        if (!date) return 'לא ידוע';
+        if (!date) {return 'לא ידוע';}
         
         try {
             const d = new Date(date);
@@ -27,7 +27,7 @@ class Utils {
     }
 
     formatDateTime(date, locale = 'he-IL') {
-        if (!date) return 'לא ידוע';
+        if (!date) {return 'לא ידוע';}
         
         try {
             const d = new Date(date);
@@ -46,7 +46,7 @@ class Utils {
     }
 
     getTimeAgo(date, locale = 'he') {
-        if (!date) return 'זמן לא ידוע';
+        if (!date) {return 'זמן לא ידוע';}
         
         const now = new Date();
         const past = new Date(date);
@@ -58,21 +58,17 @@ class Utils {
         const diffWeeks = Math.floor(diffDays / 7);
         const diffMonths = Math.floor(diffDays / 30);
 
-        if (diffMinutes < 1) return 'עכשיו';
-        if (diffMinutes < 60) return `לפני ${diffMinutes} דקות`;
-        if (diffHours < 24) return `לפני ${diffHours} שעות`;
-        if (diffDays < 7) return `לפני ${diffDays} ימים`;
-        if (diffWeeks < 4) return `לפני ${diffWeeks} שבועות`;
-        if (diffMonths < 12) return `לפני ${diffMonths} חודשים`;
-        
-        const diffYears = Math.floor(diffMonths / 12);
-        return `לפני ${diffYears} שנים`;
+        if (diffMinutes < 60) {return `${diffMinutes} דקות`;}
+        if (diffHours < 48) {return `${diffHours} שעות`;}
+        if (diffDays < 14) {return `${diffDays} ימים`;}
+        if (diffWeeks < 8) {return `${diffWeeks} שבועות`;}
+        return `${diffMonths} חודשים`;
     }
 
     // 🔍 פונקציות טקסט וחיפוש
     sanitizeText(text) {
-        if (!text || typeof text !== 'string') return '';
-        
+        if (!text || typeof text !== 'string') {return '';}
+
         return text
             .trim()
             .replace(/\s+/g, ' ') // מחליף כמה רווחים ברווח יחיד
@@ -81,28 +77,31 @@ class Utils {
     }
 
     cleanHtml(text) {
-        if (!text) return '';
+        if (!text) {return '';}
         return text.replace(/<[^>]*>/g, '');
     }
 
     escapeMarkdown(text) {
-        if (!text) return '';
-        return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
+        if (!text) {return '';}
+        // Escape MarkdownV2 special characters
+        // See: https://core.telegram.org/bots/api#markdownv2-style
+        // eslint-disable-next-line no-useless-escape
+        return text.replace(/([_\*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
     }
 
     highlightSearchTerms(text, searchTerms) {
-        if (!text || !searchTerms) return text;
-        
+        if (!text || !searchTerms) {return text;}
+
         const terms = Array.isArray(searchTerms) ? searchTerms : [searchTerms];
         let result = text;
-        
-        terms.forEach(term => {
+
+        terms.forEach((term) => {
             if (term.length > 2) {
-                const regex = new RegExp(`(${this.escapeRegExp(term)})`, 'gi');
-                result = result.replace(regex, '*$1*');
+                const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                result = result.replace(regex, '**$1**');
             }
         });
-        
+
         return result;
     }
 
@@ -117,7 +116,7 @@ class Utils {
         }
 
         const contact = contactInfo.trim();
-        
+
         // בדיקת אימייל
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (emailRegex.test(contact)) {
@@ -147,17 +146,17 @@ class Utils {
     }
 
     formatPhone(phone) {
-        if (!phone) return '';
-        
+        if (!phone) {return '';}
+
         const cleaned = phone.replace(/\D/g, '');
-        
+
         // טלפון ישראלי
         if (cleaned.startsWith('972')) {
             return `+972-${cleaned.substring(3, 5)}-${cleaned.substring(5)}`;
         } else if (cleaned.startsWith('05')) {
             return `${cleaned.substring(0, 3)}-${cleaned.substring(3)}`;
         }
-        
+
         return phone;
     }
 
@@ -168,42 +167,42 @@ class Utils {
 
     // 🏷️ פונקציות תגיות
     validateTags(tagsInput) {
-        if (!tagsInput) return [];
-        
+        if (!tagsInput) {return [];}
+
         let tags = [];
-        
+
         if (Array.isArray(tagsInput)) {
             tags = tagsInput;
         } else if (typeof tagsInput === 'string') {
             tags = tagsInput.split(/[,،]/); // תמיכה בפסיקים בעברית וערבית
         }
-        
+
         return tags
-            .map(tag => this.sanitizeText(tag))
-            .filter(tag => tag.length > 0)
-            .filter(tag => tag.length <= 50) // מגבלת אורך תגית
+            .map((tag) => this.sanitizeText(tag))
+            .filter((tag) => tag.length > 0)
+            .filter((tag) => tag.length <= 50) // מגבלת אורך תגית
             .slice(0, config.content.maxTags) // מגבלת כמות תגיות
-            .map(tag => tag.toLowerCase());
+            .map((tag) => tag.toLowerCase());
     }
 
     formatTags(tags) {
-        if (!tags || tags.length === 0) return 'אין תגיות';
-        return tags.map(tag => `#${tag}`).join(', ');
+        if (!tags || tags.length === 0) {return 'אין תגיות';}
+        return tags.map((tag) => `#${tag}`).join(', ');
     }
 
     getPopularTags(posts, limit = 10) {
         const tagCount = {};
-        
-        posts.forEach(post => {
+
+        posts.forEach((post) => {
             if (post.tags) {
-                post.tags.forEach(tag => {
+                post.tags.forEach((tag) => {
                     tagCount[tag] = (tagCount[tag] || 0) + 1;
                 });
             }
         });
 
         return Object.entries(tagCount)
-            .sort(([,a], [,b]) => b - a)
+            .sort(([, a], [, b]) => b - a)
             .slice(0, limit)
             .map(([tag, count]) => ({ tag, count }));
     }
@@ -215,24 +214,22 @@ class Utils {
         }
 
         const price = this.sanitizeText(priceInput);
-        
+
         // פורמטים מקובלים: "100-500", "100 עד 500", "500 ש״ח", וכו'
         const priceRegex = /(\d+)(?:\s*[-עד\s]\s*(\d+))?\s*(ש״ח|שקל|שקלים|₪|\$|dollar|dollars)?/i;
         const match = price.match(priceRegex);
-        
+
         if (match) {
             const min = parseInt(match[1]);
             const max = match[2] ? parseInt(match[2]) : null;
             const currency = match[3] ? this.normalizeCurrency(match[3]) : 'ש״ח';
-            
+
             if (max && min > max) {
                 return { isValid: false, error: 'המחיר המינימלי גבוה מהמקסימלי' };
             }
-            
-            const formatted = max ? 
-                `${min}-${max} ${currency}` : 
-                `${min}+ ${currency}`;
-                
+
+            const formatted = max ? `${min}-${max} ${currency}` : `${min}+ ${currency}`;
+
             return { isValid: true, formatted, min, max, currency };
         }
 
@@ -241,13 +238,13 @@ class Utils {
 
     normalizeCurrency(currency) {
         const currencyMap = {
-            'שקל': 'ש״ח',
-            'שקלים': 'ש״ח',
+            שקל: 'ש״ח',
+            שקלים: 'ש״ח',
             '₪': 'ש״ח',
-            'dollar': '$',
-            'dollars': '$'
+            dollar: '$',
+            dollars: '$',
         };
-        
+
         return currencyMap[currency.toLowerCase()] || currency;
     }
 
@@ -258,12 +255,13 @@ class Utils {
         }
 
         const linkText = this.sanitizeText(linksInput);
-        const urlRegex = /https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}/g;
+        const urlRegex =
+            /https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}/g;
         const foundLinks = linkText.match(urlRegex) || [];
 
         const validLinks = foundLinks
-            .map(link => this.normalizeUrl(link))
-            .filter(link => this.isValidUrl(link))
+            .map((link) => this.normalizeUrl(link))
+            .filter((link) => this.isValidUrl(link))
             .slice(0, 5); // מגביל ל-5 קישורים
 
         return { isValid: true, links: validLinks };
@@ -286,7 +284,7 @@ class Utils {
     }
 
     formatLinks(links) {
-        if (!links || links.length === 0) return 'אין קישורים';
+        if (!links || links.length === 0) {return 'אין קישורים';}
         return links.map((link, index) => `${index + 1}. ${link}`).join('\n');
     }
 
@@ -297,30 +295,32 @@ class Utils {
             contacts: interactions.contacts || 0,
             saves: interactions.saves || 0,
             shares: interactions.shares || 0,
-            reports: interactions.reports || 0
+            reports: interactions.reports || 0,
         };
 
         const age = this.getTimeAgo(post.created_at);
-        const engagement = stats.views > 0 ? 
-            Math.round(((stats.contacts + stats.saves + stats.shares) / stats.views) * 100) : 0;
+        const engagement =
+            stats.views > 0
+                ? Math.round(((stats.contacts + stats.saves + stats.shares) / stats.views) * 100)
+                : 0;
 
         return {
             ...stats,
             age,
             engagement: `${engagement}%`,
-            summary: this.generateStatsSummary(stats, age)
+            summary: this.generateStatsSummary(stats, age),
         };
     }
 
     generateStatsSummary(stats, age) {
         const e = this.emojis;
-        
+
         let summary = `📊 *סטטיסטיקה (${age}):*\n\n`;
         summary += `${e ? '👁️' : '•'} צפיות: ${stats.views}\n`;
         summary += `${e ? '📞' : '•'} פניות: ${stats.contacts}\n`;
         summary += `${e ? '⭐' : '•'} שמירות: ${stats.saves}\n`;
         summary += `${e ? '📤' : '•'} שיתופים: ${stats.shares}\n`;
-        
+
         if (stats.reports > 0) {
             summary += `${e ? '🚨' : '•'} דיווחים: ${stats.reports}\n`;
         }
@@ -344,11 +344,11 @@ class Utils {
         const defaultLimits = {
             posts: { count: 5, period: 3600000 }, // 5 מודעות לשעה
             searches: { count: 50, period: 3600000 }, // 50 חיפושים לשעה
-            contacts: { count: 20, period: 3600000 } // 20 פניות לשעה
+            contacts: { count: 20, period: 3600000 }, // 20 פניות לשעה
         };
 
         const limit = limits[action] || defaultLimits[action];
-        if (!limit) return { allowed: true };
+        if (!limit) {return { allowed: true };}
 
         // כאן יש לממש לוגיקת rate limiting בפועל
         // לעת עתה נחזיר תמיד מותר
@@ -357,28 +357,28 @@ class Utils {
 
     // 🎨 פונקציות עיצוב ותצוגה
     truncateText(text, maxLength = 100, suffix = '...') {
-        if (!text || text.length <= maxLength) return text;
+        if (!text || text.length <= maxLength) {return text;}
         return text.substring(0, maxLength - suffix.length) + suffix;
     }
 
     formatPostPreview(post) {
         const style = config.getPricingStyle(post.pricing_mode);
         const e = this.emojis;
-        
+
         // הוספת אינדיקציה אם המודעה מוקפאת
         let statusIcon = '';
         if (!post.is_active) {
             statusIcon = `${e ? '⏸️ ' : '[מוקפאת] '}`;
         }
-        
+
         let preview = `${statusIcon}${e ? style.emoji + ' ' : ''}*${this.truncateText(post.title, 50)}*\n`;
         preview += `${this.truncateText(post.description, 100)}\n\n`;
         preview += `${e ? '💡' : '•'} ${style.name}`;
-        
+
         if (post.price_range) {
             preview += ` • ${post.price_range}`;
         }
-        
+
         if (post.tags && post.tags.length > 0) {
             const displayTags = post.tags.slice(0, 3);
             preview += `\n${e ? '🏷️' : '#'} ${displayTags.join(', ')}`;
@@ -386,48 +386,51 @@ class Utils {
                 preview += ` +${post.tags.length - 3}`;
             }
         }
-        
+
         preview += `\n${e ? '📅' : '•'} ${this.getTimeAgo(post.created_at)}`;
-        
+
         return preview;
     }
 
     formatFullPost(post, showContact = false) {
         const style = config.getPricingStyle(post.pricing_mode);
         const e = this.emojis;
-        
+
         // הוספת סימון למודעה פרטית
         const visibilityIcon = post.visibility === 'private' ? '🔒 ' : '';
-        const visibilityNote = post.visibility === 'private' ? '\n\n🔒 *מודעת בדיקה (פרטית)* - לא מופיעה בחיפושים' : '';
-        
+        const visibilityNote =
+            post.visibility === 'private'
+                ? '\n\n🔒 *מודעת בדיקה (פרטית)* - לא מופיעה בחיפושים'
+                : '';
+
         let message = `${visibilityIcon}${e ? style.emoji + ' ' : ''}*${post.title}*\n\n`;
         message += `📄 ${post.description}\n\n`;
         message += `${e ? '💡' : '•'} *מצב תמחור:* ${style.name}\n`;
-        
+
         if (post.price_range) {
             message += `${e ? '💵' : '•'} *טווח מחיר:* ${post.price_range}\n`;
         }
-        
+
         if (post.tags && post.tags.length > 0) {
             message += `${e ? '🏷️' : '•'} *תגיות:* ${this.formatTags(post.tags)}\n`;
         }
-        
+
         if (post.portfolio_links) {
             const linkValidation = this.validateLinks(post.portfolio_links);
             if (linkValidation.links.length > 0) {
                 message += `${e ? '🔗' : '•'} *קישורים:*\n${this.formatLinks(linkValidation.links)}\n`;
             }
         }
-        
+
         if (showContact) {
             message += `\n${e ? '📞' : '•'} *פרטי קשר:* ${post.contact_info}`;
         }
-        
+
         message += `\n\n${e ? '👤' : '•'} *מפרסם:* ${post.first_name || post.username || 'אנונימי'}`;
         message += `\n${e ? '📅' : '•'} *פורסם:* ${this.formatDateTime(post.created_at)}`;
-        
+
         message += visibilityNote; // הוספת הערת פרטיות בסוף
-        
+
         return message;
     }
 
@@ -442,7 +445,7 @@ class Utils {
     }
 
     sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
     chunk(array, size) {
@@ -454,13 +457,13 @@ class Utils {
     }
 
     deepClone(obj) {
-        if (obj === null || typeof obj !== 'object') return obj;
-        if (obj instanceof Date) return new Date(obj.getTime());
-        if (obj instanceof Array) return obj.map(item => this.deepClone(item));
+        if (obj === null || typeof obj !== 'object') {return obj;}
+        if (obj instanceof Date) {return new Date(obj.getTime());}
+        if (obj instanceof Array) {return obj.map((item) => this.deepClone(item));}
         if (typeof obj === 'object') {
             const cloned = {};
-            for (let key in obj) {
-                if (obj.hasOwnProperty(key)) {
+            for (const key in obj) {
+                if (Object.prototype.hasOwnProperty.call(obj, key)) {
                     cloned[key] = this.deepClone(obj[key]);
                 }
             }
@@ -480,7 +483,7 @@ class Utils {
     logError(error, context = '') {
         const timestamp = new Date().toISOString();
         console.error(`[${timestamp}] ❌ Error${context ? ' in ' + context : ''}:`, error);
-        
+
         if (config.bot.debugMode && error.stack) {
             console.error('Stack trace:', error.stack);
         }
@@ -489,26 +492,26 @@ class Utils {
     // 📝 תיעוד ובדיקות
     validateEnvironment() {
         const issues = [];
-        
+
         if (!config.bot.token) {
             issues.push('BOT_TOKEN חסר');
         }
-        
+
         try {
             const fs = require('fs');
             const dbPath = config.database.path;
             const dir = require('path').dirname(dbPath);
-            
+
             if (!fs.existsSync(dir)) {
                 fs.mkdirSync(dir, { recursive: true });
             }
         } catch (error) {
             issues.push('בעיה בגישה לתיקיית בסיס הנתונים');
         }
-        
+
         return {
             isValid: issues.length === 0,
-            issues
+            issues,
         };
     }
 
@@ -521,8 +524,8 @@ class Utils {
             config: {
                 dbPath: config.database.path,
                 debugMode: config.bot.debugMode,
-                maxPosts: config.content.maxPostsPerUser
-            }
+                maxPosts: config.content.maxPostsPerUser,
+            },
         };
     }
 }
