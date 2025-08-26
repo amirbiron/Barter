@@ -18,7 +18,8 @@ class Utils {
             return d.toLocaleDateString(locale, {
                 year: 'numeric',
                 month: 'short',
-                day: 'numeric'
+                day: 'numeric',
+                timeZone: config.server.timezone
             });
         } catch (error) {
             return 'תאריך לא תקין';
@@ -35,7 +36,9 @@ class Utils {
                 month: 'short',
                 day: 'numeric',
                 hour: '2-digit',
-                minute: '2-digit'
+                minute: '2-digit',
+                timeZone: config.server.timezone,
+                hour12: false
             });
         } catch (error) {
             return 'זמן לא תקין';
