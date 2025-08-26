@@ -614,9 +614,10 @@ class UserHandler {
             
             if (savedPosts.length === 0) {
                 await this.bot.sendMessage(chatId, 
-                    `${this.emojis ? '⭐' : ''} *המועדפים שלכם*\n\nעדיין לא שמרתם מודעות למועדפים.\n\nכדי לשמור מודעה, לחצו על כפתור "שמור" בכל מודעה שמעניינת אתכם.`,
+                    `${this.emojis ? '⭐' : ''} המועדפים שלכם\n\nעדיין לא שמרתם מודעות למועדפים.\n\nכדי לשמור מודעה, לחצו על כפתור "שמור" בכל מודעה שמעניינת אתכם.`,
                     { 
-                        parse_mode: 'Markdown',
+                        // לא משתמשים ב-Markdown כי זה גורם לבעיות
+                        // parse_mode: 'Markdown',
                         ...keyboards.getMainKeyboard()
                     }
                 );
@@ -624,7 +625,7 @@ class UserHandler {
             }
 
             const e = this.emojis;
-            let message = `${e ? '⭐' : ''} *המועדפים שלכם (${savedPosts.length})*\n\n`;
+            let message = `${e ? '⭐' : ''} המועדפים שלכם (${savedPosts.length})\n\n`;
 
             // הצגת 10 מודעות ראשונות
             const displayPosts = savedPosts.slice(0, 10);
@@ -647,7 +648,8 @@ class UserHandler {
             }
 
             await this.bot.sendMessage(chatId, message, {
-                parse_mode: 'Markdown',
+                // לא משתמשים ב-Markdown כי זה גורם לבעיות
+                // parse_mode: 'Markdown',
                 ...keyboards.getMainKeyboard()
             });
 
