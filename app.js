@@ -21,7 +21,7 @@ console.log('🤖 הבוט מתחיל...');
 console.log('📌 גרסה: fix-all-issues-v3 - Fixed back button, persistent disk path, and deprecated callbacks');
  
 // חלון תחזוקת אתחול אוטומטי (ללא צורך במשתנה סביבה)
-const STARTUP_MAINTENANCE_WINDOW_MS = 60000; // 60 שניות
+const STARTUP_MAINTENANCE_WINDOW_MS = 10000; // 10 שניות
 
 function isMaintenanceMode() {
     // תחזוקה ידנית דרך משתנה סביבה או חלון אתחול קצר אחרי ריסטארט
