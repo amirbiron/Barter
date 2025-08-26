@@ -143,8 +143,10 @@ bot.on('message', async (msg) => {
     
     try {
         // בדיקה אם המשתמש נמצא באמצע עריכת מודעה
-        const editHandled = await userHandler.handleEditingSession(msg);
-        if (editHandled) return;
+        if (userHandler.isEditingSession(userId)) {
+            const handled = await userHandler.processEditInput(msg);
+            if (handled) return;
+        }
         
         // בדיקה אם המשתמש ממתין להזנת סיבת דיווח
         const userReportState = userHandler.userStates?.get(userId);
