@@ -13,6 +13,8 @@ class UserHandler {
         this.emojis = config.bot.useEmojis;
         this.editingSessions = new Map(); // מעקב אחרי סשני עריכה
         this.userInteractions = new Map(); // מעקב אחרי אינטראקציות משתמשים
+        this.pendingReports = new Map(); // מטמון דיווחים ממתינים
+        this.userStates = new Map(); // מטמון מצבי משתמשים במתנה
     }
 
     // 📋 ניהול מודעות מתקדם
@@ -105,10 +107,35 @@ class UserHandler {
     async handleEditField(callbackQuery) {
         const chatId = callbackQuery.message.chat.id;
         const userId = callbackQuery.from.id;
-        const [action, field, postId] = callbackQuery.data.split('_');
+        const data = callbackQuery.data;
+        
+        // Parse field and postId from callback data like "edit_title_123" or "edit_desc_123"
+        let field, postId;
+        if (data.startsWith('edit_title_')) {
+            field = 'title';
+            postId = parseInt(data.replace('edit_title_', ''));
+        } else if (data.startsWith('edit_desc_')) {
+            field = 'desc';
+            postId = parseInt(data.replace('edit_desc_', ''));
+        } else if (data.startsWith('edit_pricing_')) {
+            field = 'pricing';
+            postId = parseInt(data.replace('edit_pricing_', ''));
+        } else if (data.startsWith('edit_tags_')) {
+            field = 'tags';
+            postId = parseInt(data.replace('edit_tags_', ''));
+        } else if (data.startsWith('edit_links_')) {
+            field = 'links';
+            postId = parseInt(data.replace('edit_links_', ''));
+        } else if (data.startsWith('edit_contact_')) {
+            field = 'contact';
+            postId = parseInt(data.replace('edit_contact_', ''));
+        } else {
+            await this.bot.answerCallbackQuery(callbackQuery.id, 'שדה עריכה לא מוכר');
+            return;
+        }
 
         try {
-            const post = await db.getPost(parseInt(postId));
+            const post = await db.getPost(postId);
             
             if (!post || post.user_id !== userId) {
                 await this.bot.answerCallbackQuery(callbackQuery.id, 'אין הרשאה');
@@ -119,7 +146,7 @@ class UserHandler {
             const sessionId = `${userId}_${postId}_${field}`;
             this.editingSessions.set(sessionId, {
                 userId,
-                postId: parseInt(postId),
+                postId,
                 field,
                 originalPost: post,
                 messageId: callbackQuery.message.message_id,
@@ -350,19 +377,38 @@ class UserHandler {
     // 🗑️ מחיקת מודעות
     async confirmDeletePost(callbackQuery) {
         const chatId = callbackQuery.message.chat.id;
+        const userId = callbackQuery.from.id;
         const postId = parseInt(callbackQuery.data.split('_')[1]);
 
-        const e = this.emojis;
-        const confirmMessage = `${e ? '⚠️' : ''} *אישור מחיקה*\n\nהאם אתם בטוחים שברצונכם למחוק את המודעה?\n\n${e ? '🔥' : '•'} הפעולה בלתי הפיכה!\n${e ? '📊' : '•'} כל הנתונים והסטטיסטיקות יאבדו.`;
+        try {
+            // קבלת פרטי המודעה לאישור
+            const post = await db.getPost(postId);
+            
+            if (!post || post.user_id !== userId) {
+                await this.bot.answerCallbackQuery(callbackQuery.id, 'אין הרשאה למחוק מודעה זו');
+                return;
+            }
 
-        await this.bot.editMessageText(confirmMessage, {
-            chat_id: chatId,
-            message_id: callbackQuery.message.message_id,
-            parse_mode: 'Markdown',
-            ...keyboards.getDeleteConfirmKeyboard(postId)
-        });
+            const e = this.emojis;
+            const confirmMessage = `${e ? '⚠️' : ''} *אישור מחיקה*\n\n` +
+                `האם אתם בטוחים שברצונכם למחוק את המודעה:\n` +
+                `*"${utils.truncateText(post.title, 50)}"*?\n\n` +
+                `${e ? '🔥' : '•'} הפעולה בלתי הפיכה!\n` +
+                `${e ? '📊' : '•'} כל הנתונים והסטטיסטיקות יאבדו.`;
 
-        await this.bot.answerCallbackQuery(callbackQuery.id);
+            await this.bot.editMessageText(confirmMessage, {
+                chat_id: chatId,
+                message_id: callbackQuery.message.message_id,
+                parse_mode: 'Markdown',
+                ...keyboards.getDeleteConfirmKeyboard(postId)
+            });
+
+            await this.bot.answerCallbackQuery(callbackQuery.id, 'נדרש אישור למחיקה');
+            
+        } catch (error) {
+            utils.logError(error, 'confirmDeletePost');
+            await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
+        }
     }
 
     async executeDeletePost(callbackQuery) {
@@ -465,31 +511,172 @@ class UserHandler {
         }
     }
 
+    // 📤 שיתוף מודעה
+    async handleSharePost(callbackQuery) {
+        const userId = callbackQuery.from.id;
+        const chatId = callbackQuery.message.chat.id;
+        const data = callbackQuery.data;
+        const postId = parseInt(data.split('_')[data.startsWith('share_own_') ? 2 : 1]);
+
+        try {
+            const post = await db.getPost(postId);
+            
+            if (!post) {
+                await this.bot.answerCallbackQuery(callbackQuery.id, 'המודעה לא נמצאה');
+                return;
+            }
+
+            // רישום אינטראקציה
+            this.trackInteraction(userId, postId, 'share');
+
+            // יצירת לינק לשיתוף
+            const botUsername = (await this.bot.getMe()).username;
+            const shareLink = `https://t.me/${botUsername}?start=post_${postId}`;
+            
+            const shareMessage = `${this.emojis ? '📤' : ''} *שיתוף מודעה*\n\n` +
+                `*${post.title}*\n\n` +
+                `💰 מחיר: ${post.price}\n` +
+                `📍 איזור: ${post.location}\n\n` +
+                `🔗 לינק לשיתוף:\n\`${shareLink}\`\n\n` +
+                `_לחץ על הלינק להעתקה_`;
+
+            await this.bot.sendMessage(chatId, shareMessage, {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '↩️ חזרה למודעה', callback_data: `browse_post_${postId}` }]
+                    ]
+                }
+            });
+
+            await this.bot.answerCallbackQuery(callbackQuery.id, 
+                `${this.emojis ? '📤' : ''} לינק לשיתוף נשלח!`
+            );
+
+            utils.logAction(userId, 'share_post', { postId });
+
+        } catch (error) {
+            utils.logError(error, 'handleSharePost');
+            await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
+        }
+    }
+
     // 🚨 דיווחים
     async handleReportPost(callbackQuery) {
         const userId = callbackQuery.from.id;
+        const chatId = callbackQuery.message.chat.id;
         const postId = parseInt(callbackQuery.data.split('_')[1]);
 
         try {
+            // שמירת המודעה שמדווחים עליה בזיכרון זמני
+            if (!this.pendingReports) {
+                this.pendingReports = new Map();
+            }
+            
+            this.pendingReports.set(userId, { postId, timestamp: Date.now() });
+
+            // בקשת סיבת הדיווח
+            const reportPrompt = `${this.emojis ? '🚨' : ''} *דיווח על מודעה*\n\n` +
+                `אנא ציין את הסיבה לדיווח:\n\n` +
+                `• תוכן לא הולם\n` +
+                `• מידע שגוי או מטעה\n` +
+                `• ספאם או פרסום כפול\n` +
+                `• הונאה חשודה\n` +
+                `• אחר\n\n` +
+                `_שלח הודעה עם פירוט הבעיה_`;
+
+            await this.bot.sendMessage(chatId, reportPrompt, {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '❌ ביטול דיווח', callback_data: `cancel_report_${postId}` }]
+                    ]
+                }
+            });
+
+            await this.bot.answerCallbackQuery(callbackQuery.id, 
+                'אנא פרט את סיבת הדיווח'
+            );
+
+            // הגדרת מצב המתנה לדיווח
+            if (!this.userStates) {
+                this.userStates = new Map();
+            }
+            this.userStates.set(userId, { 
+                action: 'awaiting_report_reason', 
+                postId 
+            });
+
+            utils.logAction(userId, 'start_report', { postId });
+
+        } catch (error) {
+            utils.logError(error, 'handleReportPost');
+            await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
+        }
+    }
+
+    // ביטול דיווח
+    async cancelReport(callbackQuery) {
+        const userId = callbackQuery.from.id;
+        const chatId = callbackQuery.message.chat.id;
+        
+        try {
+            // ניקוי מצב המתנה
+            if (this.userStates) {
+                this.userStates.delete(userId);
+            }
+            if (this.pendingReports) {
+                this.pendingReports.delete(userId);
+            }
+
+            await this.bot.editMessageText('❌ הדיווח בוטל', {
+                chat_id: chatId,
+                message_id: callbackQuery.message.message_id
+            });
+
+            await this.bot.answerCallbackQuery(callbackQuery.id, 'הדיווח בוטל');
+
+        } catch (error) {
+            utils.logError(error, 'cancelReport');
+            await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
+        }
+    }
+
+    // שליחת דיווח עם סיבה
+    async submitReport(userId, chatId, reportReason) {
+        try {
+            const reportData = this.pendingReports?.get(userId);
+            if (!reportData) {
+                await this.bot.sendMessage(chatId, 'לא נמצא דיווח ממתין. אנא נסה שוב.');
+                return;
+            }
+
+            const { postId } = reportData;
+            const post = await db.getPost(postId);
+
             // רישום דיווח
             this.trackInteraction(userId, postId, 'report');
 
             const e = this.emojis;
-            const reportMessage = `${e ? '🚨' : ''} *דיווח על מודעה*\n\nהדיווח שלכם נקלט במערכת.\n\nמודעות המקבלות דיווחים מרובים נבדקות ועלולות להיות הוסרות.\n\nתודה על שמירה על איכות הקהילה!`;
+            const confirmMessage = `${e ? '✅' : ''} *הדיווח נשלח בהצלחה*\n\n` +
+                `המודעה המדווחת: "${post?.title || 'לא ידוע'}"\n` +
+                `סיבת הדיווח: ${reportReason}\n\n` +
+                `תודה על שמירה על איכות הקהילה!`;
 
-            await this.bot.answerCallbackQuery(callbackQuery.id, 'הדיווח נשלח');
-            
-            await this.bot.sendMessage(callbackQuery.message.chat.id, reportMessage, {
+            await this.bot.sendMessage(chatId, confirmMessage, {
                 parse_mode: 'Markdown',
                 ...keyboards.getMainKeyboard()
             });
 
-            utils.logAction(userId, 'report_post', { postId });
+            utils.logAction(userId, 'report_post', { postId, reason: reportReason });
 
-            // התראה למנהלים (אם יש)
+            // התראה למנהלים עם סיבת הדיווח
             if (config.security.adminUserIds.length > 0) {
-                const post = await db.getPost(postId);
-                const adminMessage = `🚨 *דיווח חדש*\n\nמודעה: "${post?.title || 'לא ידוע'}"\nמדווח: ${userId}\nID מודעה: ${postId}`;
+                const adminMessage = `🚨 *דיווח חדש*\n\n` +
+                    `מודעה: "${post?.title || 'לא ידוע'}"\n` +
+                    `מדווח: ${userId}\n` +
+                    `ID מודעה: ${postId}\n\n` +
+                    `*סיבת הדיווח:*\n${reportReason}`;
                 
                 for (const adminId of config.security.adminUserIds) {
                     try {
@@ -500,9 +687,15 @@ class UserHandler {
                 }
             }
 
+            // ניקוי מצב המתנה
+            this.pendingReports.delete(userId);
+            if (this.userStates) {
+                this.userStates.delete(userId);
+            }
+
         } catch (error) {
-            utils.logError(error, 'handleReportPost');
-            await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
+            utils.logError(error, 'submitReport');
+            await this.bot.sendMessage(chatId, config.messages.error);
         }
     }
 
