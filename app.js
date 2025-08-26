@@ -174,8 +174,50 @@ bot.on('message', async (msg) => {
                 
             case searchButtonText:
                 console.log('✅ זוהה: חיפוש');
-                await bot.sendMessage(chatId, '🔍 הקלידו מילות מפתח לחיפוש:', getMainKeyboard());
-                setUserState(userId, { step: 'search' });
+                await bot.sendMessage(chatId, '🔍 בחרו סוג חיפוש:', {
+                    reply_markup: {
+                        keyboard: [
+                            ['📌 חיפוש בכותרות בלבד'],
+                            ['🔍 חיפוש מלא (כותרת + תיאור + תגיות)'],
+                            ['❌ ביטול']
+                        ],
+                        resize_keyboard: true,
+                        one_time_keyboard: true
+                    }
+                });
+                setUserState(userId, { step: 'search_type' });
+                break;
+                
+            case '📌 חיפוש בכותרות בלבד':
+                if (userState.step === 'search_type') {
+                    console.log('📌 נבחר חיפוש בכותרות');
+                    await bot.sendMessage(chatId, '📌 הקלידו מילות מפתח לחיפוש בכותרות:', {
+                        reply_markup: {
+                            keyboard: [['❌ ביטול']],
+                            resize_keyboard: true,
+                            one_time_keyboard: true
+                        }
+                    });
+                    setUserState(userId, { step: 'search_titles' });
+                } else {
+                    await bot.sendMessage(chatId, config.messages.unknownCommand, getMainKeyboard());
+                }
+                break;
+                
+            case '🔍 חיפוש מלא (כותרת + תיאור + תגיות)':
+                if (userState.step === 'search_type') {
+                    console.log('🔍 נבחר חיפוש מלא');
+                    await bot.sendMessage(chatId, '🔍 הקלידו מילות מפתח לחיפוש מלא:', {
+                        reply_markup: {
+                            keyboard: [['❌ ביטול']],
+                            resize_keyboard: true,
+                            one_time_keyboard: true
+                        }
+                    });
+                    setUserState(userId, { step: 'search_full' });
+                } else {
+                    await bot.sendMessage(chatId, config.messages.unknownCommand, getMainKeyboard());
+                }
                 break;
                 
             case (config.bot.useEmojis ? '📱 ' : '') + 'דפדוף':
@@ -201,11 +243,32 @@ bot.on('message', async (msg) => {
                 });
                 break;
                 
+            case '❌ ביטול':
+                // ביטול חיפוש וחזרה לתפריט ראשי
+                if (userState.step === 'search' || userState.step === 'search_type' || 
+                    userState.step === 'search_titles' || userState.step === 'search_full') {
+                    console.log('❌ ביטול חיפוש');
+                    clearUserState(userId);
+                    await bot.sendMessage(chatId, '✅ החיפוש בוטל', getMainKeyboard());
+                } else {
+                    await bot.sendMessage(chatId, config.messages.unknownCommand, getMainKeyboard());
+                }
+                break;
+                
             default:
                 console.log('❓ לא זוהה כפתור, בודק מצב משתמש...');
                 // אם המשתמש במצב חיפוש
-                if (userState.step === 'search') {
-                    console.log('🔍 משתמש במצב חיפוש, מבצע חיפוש...');
+                if (userState.step === 'search_titles') {
+                    console.log('📌 משתמש במצב חיפוש כותרות, מבצע חיפוש...');
+                    await handleTitleSearch(chatId, text);
+                    clearUserState(userId);
+                } else if (userState.step === 'search_full') {
+                    console.log('🔍 משתמש במצב חיפוש מלא, מבצע חיפוש...');
+                    await handleSearch(chatId, text);
+                    clearUserState(userId);
+                } else if (userState.step === 'search') {
+                    // תמיכה לאחור - חיפוש רגיל ישן
+                    console.log('🔍 משתמש במצב חיפוש (ישן), מבצע חיפוש...');
                     await handleSearch(chatId, text);
                     clearUserState(userId);
                 } else {
@@ -397,6 +460,53 @@ async function showUserPosts(chatId, userId) {
     return userHandler.showUserPostsDetailed(chatId, userId);
 }
 
+async function handleTitleSearch(chatId, query) {
+    console.log(`📌 handleTitleSearch נקראת עבור chatId: ${chatId}, query: "${query}"`);
+    
+    try {
+        // חיפוש בכותרות בלבד
+        const results = await db.searchPostsByTitle(query);
+        console.log(`📊 תוצאות חיפוש כותרות: ${results.length} מודעות נמצאו`);
+        
+        if (results.length === 0) {
+            console.log('❌ לא נמצאו תוצאות');
+            await bot.sendMessage(chatId, '❌ לא נמצאו תוצאות התואמות לחיפוש', getMainKeyboard());
+            return;
+        }
+        
+        // יצירת כפתורי inline עבור כל תוצאה
+        const maxResults = 10; // מגבלת תוצאות לתצוגה
+        const buttons = results.slice(0, maxResults).map(post => [{
+            text: `${post.pricing_mode === 'barter' ? '🔄' : post.pricing_mode === 'payment' ? '💰' : '🔄💰'} ${post.title}`,
+            callback_data: `view_post_${post.id}`
+        }]);
+        
+        // הוספת כפתור "חזרה לתפריט"
+        buttons.push([{ text: '🔙 חזרה לתפריט ראשי', callback_data: 'back_to_main' }]);
+        
+        const message = `📌 נמצאו ${results.length} תוצאות לחיפוש "${query}":\n\n` +
+            `${results.length > maxResults ? `מוצגות ${maxResults} תוצאות ראשונות\n` : ''}` +
+            `לחצו על כותרת כדי לצפות במודעה המלאה:`;
+        
+        await bot.sendMessage(chatId, message, {
+            reply_markup: {
+                inline_keyboard: buttons
+            }
+        });
+        
+        // חזרה לתפריט ראשי
+        await bot.sendMessage(chatId, '✅ בחרו מודעה מהרשימה או חזרו לתפריט', getMainKeyboard());
+        
+        utils.logAction(chatId, 'search_titles', { query, resultsCount: results.length });
+        console.log('✅ חיפוש כותרות הושלם בהצלחה');
+        
+    } catch (error) {
+        console.error('❌ שגיאה בחיפוש כותרות:', error);
+        utils.logError(error, 'title_search_handler');
+        await bot.sendMessage(chatId, config.messages.error, getMainKeyboard());
+    }
+}
+
 // טיפול בלחיצות על כפתורים
 bot.on('callback_query', async (callbackQuery) => {
     const msg = callbackQuery.message;
@@ -411,7 +521,7 @@ bot.on('callback_query', async (callbackQuery) => {
         if (data.startsWith('pricing_')) {
             await handlePricingSelection(chatId, userId, data);
         } else if (data.startsWith('view_post_')) {
-            // New handler for viewing posts from browse list
+            // Handler for viewing posts from browse list or search results
             const parts = data.split('_');
             const postId = parseInt(parts[2]);
             const fromBrowse = parts[3] === 'from';
@@ -457,6 +567,28 @@ bot.on('callback_query', async (callbackQuery) => {
                     await bot.answerCallbackQuery(callbackQuery.id, {
                         text: 'המודעה לא נמצאה',
                         show_alert: false
+                    });
+                }
+            } else {
+                // View post from search results (not from browse)
+                const post = await db.getPost(postId);
+                
+                if (post && post.is_active) {
+                    const postMessage = formatPostMessage(post);
+                    
+                    // Send as new message with full post actions keyboard
+                    await bot.sendMessage(chatId, postMessage, {
+                        parse_mode: 'Markdown',
+                        ...getPostActionsKeyboard(postId)
+                    });
+                    
+                    // Track view
+                    userHandler.trackInteraction(userId, postId, 'view');
+                    utils.logAction(userId, 'view_post_from_search', { postId });
+                } else {
+                    await bot.answerCallbackQuery(callbackQuery.id, {
+                        text: 'המודעה לא נמצאה',
+                        show_alert: true
                     });
                 }
             }

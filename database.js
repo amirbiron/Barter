@@ -217,6 +217,67 @@ class Database {
         });
     }
 
+    // חיפוש בכותרות בלבד
+    searchPostsByTitle(query, filters = {}) {
+        console.log(`📌 searchPostsByTitle נקראת עם query: "${query}", filters:`, filters);
+        
+        return new Promise((resolve, reject) => {
+            let sql, params;
+            
+            if (query && query.trim()) {
+                // חיפוש בכותרות בלבד עם LIKE
+                sql = `
+                    SELECT p.*, u.username, u.first_name
+                    FROM posts p
+                    JOIN users u ON p.user_id = u.user_id
+                    WHERE p.title LIKE ? AND p.is_active = 1
+                `;
+                params = [`%${query}%`];
+                console.log(`📌 חיפוש בכותרות: "${query}"`);
+                
+                // הוספת סינונים
+                if (filters.pricingMode) {
+                    sql += ` AND p.pricing_mode IN ('${filters.pricingMode}', 'both')`;
+                }
+                
+            } else {
+                // אם אין חיפוש טקסט, הצג את כל המודעות
+                sql = `
+                    SELECT p.*, u.username, u.first_name
+                    FROM posts p
+                    JOIN users u ON p.user_id = u.user_id
+                    WHERE p.is_active = 1
+                `;
+                params = [];
+                console.log('📌 אין query - מחזיר את כל המודעות הפעילות');
+                
+                if (filters.pricingMode) {
+                    sql += ` AND p.pricing_mode IN ('${filters.pricingMode}', 'both')`;
+                }
+            }
+            
+            sql += ` ORDER BY p.created_at DESC LIMIT 20`;
+            
+            console.log('🔧 SQL query:', sql.replace(/\s+/g, ' ').trim());
+            console.log('🔧 Parameters:', params);
+            
+            this.db.all(sql, params, (err, rows) => {
+                if (err) {
+                    console.error('❌ שגיאת מסד נתונים בחיפוש כותרות:', err);
+                    reject(err);
+                } else {
+                    console.log(`✅ נמצאו ${rows.length} תוצאות`);
+                    // המרת JSON strings חזרה למערכים
+                    const results = rows.map(row => ({
+                        ...row,
+                        tags: JSON.parse(row.tags || '[]')
+                    }));
+                    resolve(results);
+                }
+            });
+        });
+    }
+
     // חיפוש מודעות (FTS5)
     searchPosts(query, filters = {}) {
         console.log(`🔍 searchPosts נקראת עם query: "${query}", filters:`, filters);
