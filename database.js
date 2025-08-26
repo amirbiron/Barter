@@ -276,10 +276,20 @@ class Database {
                 WHERE user_id = ?
                 ORDER BY created_at DESC
             `;
+            
             this.db.all(sql, [userId], (err, rows) => {
-                if (err) reject(err);
-                else {
-                    const results = rows.map(row => ({
+                if (err) {
+                    console.error('[DEBUG] Error getting user posts:', err);
+                    reject(err);
+                } else {
+                    console.log(`[DEBUG] getUserPosts for user ${userId} - found ${rows?.length || 0} posts`);
+                    if (rows) {
+                        rows.forEach(post => {
+                            console.log(`[DEBUG] Post ${post.id}: active=${post.is_active}, title="${post.title}"`);
+                        });
+                    }
+                    
+                    const results = (rows || []).map(row => ({
                         ...row,
                         tags: JSON.parse(row.tags || '[]')
                     }));
@@ -307,14 +317,40 @@ class Database {
     // הפעלה/הקפאה של מודעה
     togglePost(postId, userId) {
         return new Promise((resolve, reject) => {
-            const sql = `
-                UPDATE posts 
-                SET is_active = 1 - is_active, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ? AND user_id = ?
-            `;
-            this.db.run(sql, [postId, userId], function(err) {
-                if (err) reject(err);
-                else resolve(this.changes > 0);
+            console.log(`[DEBUG] togglePost called - postId: ${postId}, userId: ${userId}`);
+            
+            // קודם נבדוק מה המצב הנוכחי
+            this.db.get('SELECT is_active FROM posts WHERE id = ? AND user_id = ?', [postId, userId], (err, row) => {
+                if (err) {
+                    console.error('[DEBUG] Error checking post status:', err);
+                    reject(err);
+                    return;
+                }
+                
+                console.log(`[DEBUG] Current post status:`, row);
+                
+                // עכשיו נעדכן
+                const sql = `
+                    UPDATE posts 
+                    SET is_active = 1 - is_active, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ? AND user_id = ?
+                `;
+                
+                this.db.run(sql, [postId, userId], function(err) {
+                    if (err) {
+                        console.error('[DEBUG] Error toggling post:', err);
+                        reject(err);
+                    } else {
+                        console.log(`[DEBUG] Toggle result - changes: ${this.changes}`);
+                        
+                        // בדיקה אחרי העדכון
+                        this.db.get('SELECT id, is_active FROM posts WHERE id = ?', [postId], (err2, row2) => {
+                            console.log(`[DEBUG] Post after toggle:`, row2);
+                        });
+                        
+                        resolve(this.changes > 0);
+                    }
+                }.bind(this));
             });
         });
     }
