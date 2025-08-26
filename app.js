@@ -600,7 +600,7 @@ async function handleTitleSearch(chatId, query) {
         // יצירת כפתורי inline עבור כל תוצאה
         const maxResults = 10; // מגבלת תוצאות לתצוגה
         const buttons = results.slice(0, maxResults).map(post => [{
-            text: `${post.pricing_mode === 'barter' ? '🔄' : post.pricing_mode === 'payment' ? '💰' : '🔄💰'} ${post.title}`,
+            text: `${post.pricing_mode === 'barter' ? '🫱🏻‍🫲🏽' : post.pricing_mode === 'payment' ? '💰' : '🫱🏻‍🫲🏽💰'} ${post.title}`,
             callback_data: `view_post_${post.id}`
         }]);
         
@@ -981,9 +981,9 @@ async function handleBrowseSelection(chatId, data, messageId = null, page = 1) {
             } else if (post.pricing_mode === 'payment') {
                 emoji = config.bot.useEmojis ? '💰 ' : '[תשלום] ';
             } else if (post.pricing_mode === 'barter') {
-                emoji = config.bot.useEmojis ? '🤝 ' : '[בארטר] ';
+                emoji = config.bot.useEmojis ? '🫱🏻‍🫲🏽 ' : '[בארטר] ';
             } else if (post.pricing_mode === 'both') {
-                emoji = config.bot.useEmojis ? '💰🤝 ' : '[שניהם] ';
+                emoji = config.bot.useEmojis ? '💰🫱🏻‍🫲🏽 ' : '[שניהם] ';
             }
             
             message += `${number}. ${emoji}${title}\n`;

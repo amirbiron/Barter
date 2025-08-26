@@ -33,9 +33,9 @@ class KeyboardManager {
         return {
             reply_markup: {
                 inline_keyboard: [
-                    [{ text: `${e ? '🔄 ' : ''}בארטר`, callback_data: 'pricing_barter' }],
+                    [{ text: `${e ? '🫱🏻‍🫲🏽 ' : ''}בארטר`, callback_data: 'pricing_barter' }],
                     [{ text: `${e ? '💰 ' : ''}תשלום`, callback_data: 'pricing_payment' }],
-                    [{ text: `${e ? '🔄💰 ' : ''}שניהם`, callback_data: 'pricing_both' }],
+                    [{ text: `${e ? '🫱🏻‍🫲🏽💰 ' : ''}שניהם`, callback_data: 'pricing_both' }],
                     [{ text: `${e ? '🆓 ' : ''}חינם`, callback_data: 'pricing_free' }],
                     [{ text: `${e ? '🔙 ' : ''}חזרה`, callback_data: 'back_to_main' }]
                 ]
@@ -51,7 +51,7 @@ class KeyboardManager {
             reply_markup: {
                 inline_keyboard: [
                     [
-                        { text: `${e ? '🔄 ' : ''}בארטר`, callback_data: 'browse_barter' },
+                        { text: `${e ? '🫱🏻‍🫲🏽 ' : ''}בארטר`, callback_data: 'browse_barter' },
                         { text: `${e ? '💰 ' : ''}תשלום`, callback_data: 'browse_payment' }
                     ],
                     [
@@ -194,7 +194,7 @@ class KeyboardManager {
                 inline_keyboard: [
                     [{ text: `${e ? '🔍 ' : ''}חיפוש חופשי`, callback_data: 'search_free' }],
                     [
-                        { text: `${e ? '🔄 ' : ''}רק בארטר`, callback_data: 'search_barter' },
+                        { text: `${e ? '🫱🏻‍🫲🏽 ' : ''}רק בארטר`, callback_data: 'search_barter' },
                         { text: `${e ? '💰 ' : ''}רק תשלום`, callback_data: 'search_payment' }
                     ],
                     [{ text: `${e ? '🏷️ ' : ''}חיפוש בתגיות`, callback_data: 'search_tags' }],

@@ -278,7 +278,7 @@ ${emojis ? '❓' : ''} *שאלות?* פנו למפתח: ${this.contacts.develope
     getPricingStyle(pricingMode) {
         const styles = {
             barter: {
-                emoji: '🔄',
+                emoji: '🫱🏻‍🫲🏽',
                 name: 'בארטר',
                 color: this.ui.colors.barter
             },
@@ -288,7 +288,7 @@ ${emojis ? '❓' : ''} *שאלות?* פנו למפתח: ${this.contacts.develope
                 color: this.ui.colors.payment
             },
             both: {
-                emoji: '🔄💰',
+                emoji: '🫱🏻‍🫲🏽💰',
                 name: 'בארטר או תשלום',
                 color: this.ui.colors.both
             },
