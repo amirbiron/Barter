@@ -730,12 +730,13 @@ bot.on('callback_query', async (callbackQuery) => {
         } else if (data.startsWith('visibility_')) {
             await handleVisibilitySelection(chatId, userId, data);
         } else if (data.startsWith('view_post_')) {
-            // Handler for viewing posts from browse list or search results
+            // Handler for viewing posts from browse list, search results, or alerts
             const parts = data.split('_');
             const postId = parseInt(parts[2]);
-            const fromBrowse = parts[3] === 'from';
+            const isFrom = parts[3] === 'from';
+            const origin = isFrom ? parts[4] : null;
             
-            if (fromBrowse) {
+            if (isFrom && origin === 'browse') {
                 // Extract browse context (browse type and page)
                 const browseType = parts[5];
                 const page = parts[6] || 1;
@@ -776,6 +777,43 @@ bot.on('callback_query', async (callbackQuery) => {
                     await bot.answerCallbackQuery(callbackQuery.id, {
                         text: 'המודעה לא נמצאה',
                         show_alert: false
+                    });
+                }
+            } else if (isFrom && origin === 'alert') {
+                // View post from an alert - use back-to-alerts keyboard and save carries alert context
+                const post = await db.getPost(postId);
+                
+                if (post && post.is_active) {
+                    const postMessage = formatPostMessage(post);
+                    const e = config.bot.useEmojis;
+                    const keyboard = {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
+                                    { text: `${e ? '⭐ ' : ''}שמור`, callback_data: `save_${postId}_from_alert` }
+                                ],
+                                [
+                                    { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
+                                    { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
+                                ],
+                                [{ text: `${e ? '🔙 ' : ''}חזרה להתראות`, callback_data: 'alert_menu' }]
+                            ]
+                        }
+                    };
+                    
+                    // Send as a new message to keep the original alert intact
+                    await bot.sendMessage(chatId, postMessage, {
+                        parse_mode: 'Markdown',
+                        ...keyboard
+                    });
+                    
+                    userHandler.trackInteraction(userId, postId, 'view');
+                    utils.logAction(userId, 'view_post_from_alert', { postId });
+                } else {
+                    await bot.answerCallbackQuery(callbackQuery.id, {
+                        text: 'המודעה לא נמצאה',
+                        show_alert: true
                     });
                 }
             } else {
@@ -1462,7 +1500,7 @@ async function checkAndSendAlerts(postId, postTitle, postDescription, postUserId
                         reply_markup: {
                             inline_keyboard: [
                                 [
-                                    { text: '👁️ צפה במודעה', callback_data: `view_post_${postId}` },
+                                    { text: '👁️ צפה במודעה', callback_data: `view_post_${postId}_from_alert` },
                                     { text: '⭐ שמור', callback_data: `save_${postId}` }
                                 ]
                             ]
