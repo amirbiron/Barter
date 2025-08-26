@@ -111,12 +111,24 @@ class Database {
                         portfolio_links TEXT,
                         contact_info TEXT NOT NULL,
                         tags TEXT, -- JSON string של מערך תגיות
+                        visibility TEXT CHECK(visibility IN ('public', 'private')) DEFAULT 'public',
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                         is_active INTEGER DEFAULT 1,
                         FOREIGN KEY (user_id) REFERENCES users (user_id)
                     )
                 `);
+
+                // Migration: הוספת עמודת visibility לטבלה קיימת
+                this.db.run(`
+                    ALTER TABLE posts ADD COLUMN visibility TEXT DEFAULT 'public'
+                `, (err) => {
+                    if (err && !err.message.includes('duplicate column')) {
+                        console.log('⚠️ לא ניתן להוסיף עמודת visibility (כנראה כבר קיימת)');
+                    } else if (!err) {
+                        console.log('✅ עמודת visibility נוספה לטבלת posts');
+                    }
+                });
 
                 // טבלת FTS5 לחיפוש מהיר (Virtual Table)
                 this.db.run(`
@@ -202,15 +214,16 @@ class Database {
     // יצירת מודעה חדשה
     createPost(postData) {
         return new Promise((resolve, reject) => {
-            const { userId, title, description, pricingMode, priceRange, portfolioLinks, contactInfo, tags } = postData;
+            const { userId, title, description, pricingMode, priceRange, portfolioLinks, contactInfo, tags, visibility } = postData;
             const tagsJson = JSON.stringify(tags || []);
+            const postVisibility = visibility || 'public'; // ברירת מחדל: ציבורי
             
             const sql = `
-                INSERT INTO posts (user_id, title, description, pricing_mode, price_range, portfolio_links, contact_info, tags)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO posts (user_id, title, description, pricing_mode, price_range, portfolio_links, contact_info, tags, visibility)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             
-            this.db.run(sql, [userId, title, description, pricingMode, priceRange, portfolioLinks, contactInfo, tagsJson], function(err) {
+            this.db.run(sql, [userId, title, description, pricingMode, priceRange, portfolioLinks, contactInfo, tagsJson, postVisibility], function(err) {
                 if (err) reject(err);
                 else resolve(this.lastID);
             });
@@ -231,8 +244,9 @@ class Database {
                     FROM posts p
                     JOIN users u ON p.user_id = u.user_id
                     WHERE p.title LIKE ? AND p.is_active = 1
+                    AND (p.visibility = 'public' OR p.user_id = ?)
                 `;
-                params = [`%${query}%`];
+                params = [`%${query}%`, filters.userId || 0];
                 console.log(`📌 חיפוש בכותרות: "${query}"`);
                 
                 // הוספת סינונים
@@ -247,8 +261,9 @@ class Database {
                     FROM posts p
                     JOIN users u ON p.user_id = u.user_id
                     WHERE p.is_active = 1
+                    AND (p.visibility = 'public' OR p.user_id = ?)
                 `;
-                params = [];
+                params = [filters.userId || 0];
                 console.log('📌 אין query - מחזיר את כל המודעות הפעילות');
                 
                 if (filters.pricingMode) {
@@ -293,8 +308,9 @@ class Database {
                     JOIN posts p ON f.rowid = p.id
                     JOIN users u ON p.user_id = u.user_id
                     WHERE posts_fts MATCH ? AND p.is_active = 1
+                    AND (p.visibility = 'public' OR p.user_id = ?)
                 `;
-                params = [query];
+                params = [query, filters.userId || 0];
                 console.log(`📊 משתמש ב-FTS5 לחיפוש: "${query}"`);
                 
                 // הוספת סינונים
@@ -309,8 +325,9 @@ class Database {
                     FROM posts p
                     JOIN users u ON p.user_id = u.user_id
                     WHERE p.is_active = 1
+                    AND (p.visibility = 'public' OR p.user_id = ?)
                 `;
-                params = [];
+                params = [filters.userId || 0];
                 console.log('📊 אין query - מחזיר את כל המודעות הפעילות');
                 
                 if (filters.pricingMode) {

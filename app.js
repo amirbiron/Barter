@@ -285,16 +285,16 @@ bot.on('message', async (msg) => {
                 // אם המשתמש במצב חיפוש
                 if (userState.step === 'search_titles') {
                     console.log('📌 משתמש במצב חיפוש כותרות, מבצע חיפוש...');
-                    await handleTitleSearch(chatId, text);
+                    await handleTitleSearch(chatId, text, userId);
                     clearUserState(userId);
                 } else if (userState.step === 'search_full') {
                     console.log('🔍 משתמש במצב חיפוש מלא, מבצע חיפוש...');
-                    await handleSearch(chatId, text);
+                    await handleSearch(chatId, text, userId);
                     clearUserState(userId);
                 } else if (userState.step === 'search') {
                     // תמיכה לאחור - חיפוש רגיל ישן
                     console.log('🔍 משתמש במצב חיפוש (ישן), מבצע חיפוש...');
-                    await handleSearch(chatId, text);
+                    await handleSearch(chatId, text, userId);
                     clearUserState(userId);
                 } else {
                     console.log('⚠️ פקודה לא מוכרת');
@@ -385,7 +385,20 @@ async function handlePostCreation(msg, userState) {
             
         case 'tags':
             const tags = utils.validateTags(text === 'דלג' ? '' : text);
-            await savePost(chatId, userId, { ...userState, tags });
+            setUserState(userId, { ...userState, step: 'visibility', tags });
+            
+            // שלב חדש - בחירת visibility
+            await bot.sendMessage(chatId, '🔐 האם המודעה תהיה ציבורית או פרטית?\n\n' +
+                '• *ציבורית* - כולם יוכלו לראות את המודעה\n' +
+                '• *פרטית* - רק אתם תוכלו לראות (לבדיקות)', {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🌍 ציבורית', callback_data: 'visibility_public' }],
+                        [{ text: '🔒 פרטית (רק לי)', callback_data: 'visibility_private' }]
+                    ]
+                }
+            });
             break;
     }
 }
@@ -414,10 +427,14 @@ async function savePost(chatId, userId, postData) {
             priceRange: postData.price_range,
             portfolioLinks: postData.portfolio_links,
             contactInfo: postData.contact_info,
-            tags: postData.tags
+            tags: postData.tags,
+            visibility: postData.visibility || 'public' // ברירת מחדל: ציבורית
         });
         
-        await bot.sendMessage(chatId, config.messages.postCreated, {
+        const visibilityMessage = postData.visibility === 'private' ? 
+            '\n\n🔒 *המודעה נשמרה כפרטית* - רק אתם יכולים לראות אותה' : '';
+        
+        await bot.sendMessage(chatId, config.messages.postCreated + visibilityMessage, {
             parse_mode: 'Markdown',
             ...getMainKeyboard()
         });
@@ -432,11 +449,11 @@ async function savePost(chatId, userId, postData) {
     }
 }
 
-async function handleSearch(chatId, query) {
-    console.log(`🔍 handleSearch נקראת עבור chatId: ${chatId}, query: "${query}"`);
+async function handleSearch(chatId, query, userId) {
+    console.log(`🔍 handleSearch נקראת עבור chatId: ${chatId}, query: "${query}", userId: ${userId}`);
     
     try {
-        const results = await db.searchPosts(query);
+        const results = await db.searchPosts(query, { userId });
         console.log(`📊 תוצאות חיפוש: ${results.length} מודעות נמצאו`);
         
         if (results.length === 0) {
@@ -485,12 +502,12 @@ async function showUserPosts(chatId, userId) {
     return userHandler.showUserPostsDetailed(chatId, userId);
 }
 
-async function handleTitleSearch(chatId, query) {
-    console.log(`📌 handleTitleSearch נקראת עבור chatId: ${chatId}, query: "${query}"`);
+async function handleTitleSearch(chatId, query, userId) {
+    console.log(`📌 handleTitleSearch נקראת עבור chatId: ${chatId}, query: "${query}", userId: ${userId}`);
     
     try {
         // חיפוש בכותרות בלבד
-        const results = await db.searchPostsByTitle(query);
+        const results = await db.searchPostsByTitle(query, { userId });
         console.log(`📊 תוצאות חיפוש כותרות: ${results.length} מודעות נמצאו`);
         
         if (results.length === 0) {
@@ -502,7 +519,7 @@ async function handleTitleSearch(chatId, query) {
         // יצירת כפתורי inline עבור כל תוצאה
         const maxResults = 10; // מגבלת תוצאות לתצוגה
         const buttons = results.slice(0, maxResults).map(post => [{
-            text: `${post.pricing_mode === 'barter' ? '🔄' : post.pricing_mode === 'payment' ? '💰' : '🔄💰'} ${post.title}`,
+            text: `${post.visibility === 'private' ? '🔒' : ''} ${post.pricing_mode === 'barter' ? '🔄' : post.pricing_mode === 'payment' ? '💰' : '🔄💰'} ${post.title}`,
             callback_data: `view_post_${post.id}`
         }]);
         
@@ -545,6 +562,8 @@ bot.on('callback_query', async (callbackQuery) => {
         // ניתוב לפי סוג הפעולה
         if (data.startsWith('pricing_')) {
             await handlePricingSelection(chatId, userId, data);
+        } else if (data.startsWith('visibility_')) {
+            await handleVisibilitySelection(chatId, userId, data);
         } else if (data.startsWith('view_post_')) {
             // Handler for viewing posts from browse list or search results
             const parts = data.split('_');
@@ -782,6 +801,23 @@ bot.on('callback_query', async (callbackQuery) => {
         });
     }
 });
+
+async function handleVisibilitySelection(chatId, userId, data) {
+    const visibility = data.replace('visibility_', '');
+    const userState = getUserState(userId);
+    
+    if (userState.step !== 'visibility') {
+        await bot.answerCallbackQuery(callbackQuery.id, {
+            text: 'פג תוקף הבחירה',
+            show_alert: false
+        });
+        return;
+    }
+    
+    // שמירת המודעה עם ה-visibility שנבחר
+    await savePost(chatId, userId, { ...userState, visibility });
+    clearUserState(userId);
+}
 
 async function handlePricingSelection(chatId, userId, data) {
     const pricingMode = data.replace('pricing_', '');
