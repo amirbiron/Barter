@@ -574,7 +574,7 @@ class UserHandler {
                     console.log('[DEBUG] Trying to show unsave alert...');
                     await this.bot.answerCallbackQuery(callbackQuery.id, {
                         text: `💔 המודעה הוסרה מהמועדפים`,
-                        show_alert: true
+                        show_alert: false
                     });
                     console.log('[DEBUG] Unsave alert shown successfully');
                 } catch (alertErr) {
@@ -591,7 +591,7 @@ class UserHandler {
                         console.log('[DEBUG] Trying to show save alert...');
                         await this.bot.answerCallbackQuery(callbackQuery.id, {
                             text: `⭐ המודעה נשמרה למועדפים!`,
-                            show_alert: true
+                            show_alert: false
                         });
                         console.log('[DEBUG] Save alert shown successfully');
                     } catch (alertErr) {
@@ -603,7 +603,7 @@ class UserHandler {
                     try {
                         await this.bot.answerCallbackQuery(callbackQuery.id, {
                             text: `⚠️ המודעה כבר שמורה במועדפים`,
-                            show_alert: true
+                            show_alert: false
                         });
                     } catch (alertErr) {
                         console.error('[DEBUG] Error showing already saved alert:', alertErr.message);
