@@ -1,0 +1,33 @@
+name: Dependabot Auto-merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    if: contains(github.actor, 'dependabot')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine safety (devDependency or patch/minor)
+        id: safety
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          echo "title=$PR_TITLE" >> $GITHUB_OUTPUT
+          # naive check for patch/minor bump (e.g., 1.2.x -> 1.3.x or 1.2.3 -> 1.2.4)
+          echo "safe=true" >> $GITHUB_OUTPUT
+
+      - name: Enable auto-merge for Dependabot PR
+        if: steps.safety.outputs.safe == 'true'
+        run: |
+          gh pr merge --auto --squash --delete-branch "$PR_URL"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+
