@@ -219,6 +219,7 @@ bot.on('message', async (msg) => {
                 userStates.set(userId, persisted);
                 userState = persisted;
                 console.log(`♻️ שוחזר מצב משתמש מה-DB:`, userState);
+                await bot.sendMessage(chatId, '✅ המשכנו מאיפה שעצרת');
             }
         } catch (e) {
             // ignore
@@ -455,11 +456,11 @@ async function startPostCreation(chatId, userId) {
     // תחזוקה: חסימת יצירת מודעה בזמן דיפלוי/תחזוקה
     if (process.env.MAINTENANCE_MODE === 'true') {
         await bot.sendMessage(chatId,
-            '🔧 הבוט בתהליך עדכון קצר כרגע.\n\n' +
-            'אנא נסו שוב בעוד כמה דקות.\n\n' +
-            'טיפ: הטקסט שהקלדתם לא נשמר, אז מומלץ להעתיק לפני סגירה.',
+            '🔧 הבוט בתהליך עדכון קצר כרגע...\n\n' +
+            'אנא נסו שוב בעוד כדקה...',
             getMainKeyboard()
         );
+        clearUserState(userId);
         return;
     }
     
@@ -766,6 +767,7 @@ bot.on('callback_query', async (callbackQuery) => {
             if (persisted) {
                 userStates.set(userId, persisted);
                 console.log(`♻️ שוחזר מצב משתמש מה-DB (callback):`, persisted);
+                await bot.sendMessage(chatId, '✅ המשכנו מאיפה שעצרת');
             }
         } catch (e) {
             // ignore
