@@ -449,8 +449,13 @@ class Database {
                 WHERE user_id = ? AND post_id = ?
             `;
             this.db.get(sql, [userId, postId], (err, row) => {
-                if (err) reject(err);
-                else resolve(row.count > 0);
+                if (err) {
+                    console.error('[DEBUG] Error checking if post saved:', err);
+                    reject(err);
+                } else {
+                    console.log(`[DEBUG] isPostSaved - userId: ${userId}, postId: ${postId}, count: ${row.count}`);
+                    resolve(row.count > 0);
+                }
             });
         });
     }
