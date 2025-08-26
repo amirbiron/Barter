@@ -18,7 +18,7 @@ const bot = new TelegramBot(config.bot.token, {
 });
 
 console.log('🤖 הבוט מתחיל...');
-console.log('📌 גרסה: c08f67a - Fixed ALL callback queries and frozen post buttons');
+console.log('📌 גרסה: fix-sqlite-readonly - Fixed database permissions for Render persistent disk');
 
 // מצבי משתמשים (לשמירת context של שיחות)
 const userStates = new Map();
