@@ -591,7 +591,7 @@ class UserHandler {
                 
                 // עדכון כפתור שמירה בהודעה
                 try {
-                    const isAdmin = this.config.isAdmin(userId);
+                    const isAdmin = config.isAdmin(userId);
                     const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, false, isAdmin);
                     await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
                         chat_id: chatId,
@@ -620,7 +620,7 @@ class UserHandler {
                     
                     // עדכון כפתור שמירה בהודעה
                     try {
-                        const isAdmin = this.config.isAdmin(userId);
+                        const isAdmin = config.isAdmin(userId);
                         const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, true, isAdmin);
                         await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
                             chat_id: chatId,
@@ -643,7 +643,7 @@ class UserHandler {
                     
                     // וודא שהכפתור מציג מצב "שמורה"
                     try {
-                        const isAdmin = this.config.isAdmin(userId);
+                        const isAdmin = config.isAdmin(userId);
                         const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, true, isAdmin);
                         await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
                             chat_id: chatId,
