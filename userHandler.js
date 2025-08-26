@@ -596,6 +596,17 @@ class UserHandler {
                     console.error('[DEBUG] Error showing unsave alert:', alertErr.message);
                 }
                 
+                // עדכון כפתור שמירה בהודעה
+                try {
+                    const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, false);
+                    await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
+                        chat_id: chatId,
+                        message_id: callbackQuery.message.message_id
+                    });
+                } catch (kbErr) {
+                    console.error('[DEBUG] Error updating save button (unsave):', kbErr.message);
+                }
+                
                 utils.logAction(userId, 'unsave_post', { postId });
             } else {
                 // הוספה למועדפים
@@ -613,6 +624,17 @@ class UserHandler {
                         console.error('[DEBUG] Error showing save alert:', alertErr.message);
                     }
                     
+                    // עדכון כפתור שמירה בהודעה
+                    try {
+                        const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, true);
+                        await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
+                            chat_id: chatId,
+                            message_id: callbackQuery.message.message_id
+                        });
+                    } catch (kbErr) {
+                        console.error('[DEBUG] Error updating save button (save):', kbErr.message);
+                    }
+                    
                     utils.logAction(userId, 'save_post', { postId });
                 } else {
                     try {
@@ -622,6 +644,17 @@ class UserHandler {
                         });
                     } catch (alertErr) {
                         console.error('[DEBUG] Error showing already saved alert:', alertErr.message);
+                    }
+                    
+                    // וודא שהכפתור מציג מצב "שמורה"
+                    try {
+                        const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, true);
+                        await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
+                            chat_id: chatId,
+                            message_id: callbackQuery.message.message_id
+                        });
+                    } catch (kbErr) {
+                        console.error('[DEBUG] Error updating save button (already saved):', kbErr.message);
                     }
                 }
             }
