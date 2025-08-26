@@ -558,6 +558,7 @@ class UserHandler {
     async handleSavePost(callbackQuery) {
         console.log('[DEBUG] handleSavePost called');
         const userId = callbackQuery.from.id;
+        const chatId = callbackQuery.message.chat.id;
         const postId = parseInt(callbackQuery.data.split('_')[1]);
 
         try {
@@ -568,24 +569,29 @@ class UserHandler {
             if (isSaved) {
                 // הסרה מהמועדפים
                 await db.unsavePost(userId, postId);
+                
+                // הודעה קופצת
                 await this.bot.answerCallbackQuery(callbackQuery.id, {
-                    text: `${this.emojis ? '💔' : ''} המודעה הוסרה מהמועדפים`,
-                    show_alert: false
+                    text: `💔 המודעה הוסרה מהמועדפים`,
+                    show_alert: true
                 });
+                
                 utils.logAction(userId, 'unsave_post', { postId });
             } else {
                 // הוספה למועדפים
                 const result = await db.savePost(userId, postId);
                 if (result.saved) {
+                    // הודעה קופצת
                     await this.bot.answerCallbackQuery(callbackQuery.id, {
-                        text: `${this.emojis ? '⭐' : ''} המודעה נשמרה למועדפים!`,
-                        show_alert: false
+                        text: `⭐ המודעה נשמרה למועדפים!`,
+                        show_alert: true
                     });
+                    
                     utils.logAction(userId, 'save_post', { postId });
                 } else {
                     await this.bot.answerCallbackQuery(callbackQuery.id, {
-                        text: `${this.emojis ? '⚠️' : ''} המודעה כבר שמורה במועדפים`,
-                        show_alert: false
+                        text: `⚠️ המודעה כבר שמורה במועדפים`,
+                        show_alert: true
                     });
                 }
             }
@@ -595,7 +601,10 @@ class UserHandler {
 
         } catch (error) {
             utils.logError(error, 'handleSavePost');
-            await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
+            await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: '❌ שגיאה בשמירת המודעה',
+                show_alert: true
+            });
         }
     }
 
@@ -625,7 +634,10 @@ class UserHandler {
                 const pricingStyle = config.getPricingStyle(post.pricing_mode);
                 const savedDate = new Date(post.saved_at).toLocaleDateString('he-IL');
                 
-                message += `${e ? '📌' : '•'} *${utils.escapeMarkdown(post.title)}*\n`;
+                // מנקה את הכותרת מתווים בעייתיים
+                const cleanTitle = post.title.replace(/[_*\[\]()~`>#+\-=|{}.!\\]/g, '');
+                
+                message += `${e ? '📌' : '•'} *${cleanTitle}*\n`;
                 message += `${e ? '💰' : ''} ${pricingStyle.name}\n`;
                 message += `${e ? '📅' : ''} נשמר ב: ${savedDate}\n`;
                 message += `${e ? '👁' : ''} /view_${post.id}\n\n`;
