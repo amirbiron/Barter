@@ -10,10 +10,28 @@ const getDatabasePath = () => {
         return process.env.DATABASE_PATH;
     }
     
-    // אם אנחנו ב-Render עם דיסק מתמיד
-    if (process.env.RENDER && fs.existsSync('/opt/render/project/data')) {
-        console.log('📁 Render: משתמש בדיסק מתמיד');
-        return path.join('/opt/render/project/data', 'barter_bot.db');
+    // אם אנחנו ב-Render
+    if (process.env.RENDER) {
+        // נסה קודם את הדיסק המתמיד אם הוא קיים ויש הרשאות
+        const persistentPath = '/opt/render/project/data';
+        try {
+            if (fs.existsSync(persistentPath)) {
+                // בדוק אם יש הרשאות כתיבה
+                fs.accessSync(persistentPath, fs.constants.W_OK);
+                console.log('📁 Render: משתמש בדיסק מתמיד');
+                return path.join(persistentPath, 'barter_bot.db');
+            }
+        } catch (err) {
+            console.log('⚠️ אין הרשאות כתיבה לדיסק המתמיד');
+        }
+        
+        // אם אין דיסק מתמיד או אין הרשאות, השתמש ב-/tmp
+        console.log('📁 Render: משתמש בתיקיית /tmp (זמני - יימחק בכל deploy!)');
+        const tmpDir = '/tmp/barter_bot_data';
+        if (!fs.existsSync(tmpDir)) {
+            fs.mkdirSync(tmpDir, { recursive: true });
+        }
+        return path.join(tmpDir, 'barter_bot.db');
     }
     
     // ברירת מחדל - תיקייה מקומית

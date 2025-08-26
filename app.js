@@ -18,7 +18,15 @@ const bot = new TelegramBot(config.bot.token, {
 });
 
 console.log('🤖 הבוט מתחיל...');
-console.log('📌 גרסה: fix-sqlite-readonly - Fixed database permissions for Render persistent disk');
+console.log('📌 גרסה: fix-db-path-v2 - Use /tmp if persistent disk is readonly');
+
+// הצג את הגדרות הסביבה החשובות
+if (process.env.RENDER) {
+    console.log('🌐 רץ על Render');
+}
+if (process.env.DATABASE_PATH) {
+    console.log(`📁 נתיב מותאם אישית למסד נתונים: ${process.env.DATABASE_PATH}`);
+}
 
 // מצבי משתמשים (לשמירת context של שיחות)
 const userStates = new Map();
