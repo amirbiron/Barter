@@ -18,7 +18,8 @@ class KeyboardManager {
                 keyboard: [
                     [`${e ? '📝 ' : ''}פרסום שירות`, `${e ? '🔍 ' : ''}חיפוש`],
                     [`${e ? '📱 ' : ''}דפדוף`, `${e ? '📋 ' : ''}המודעות שלי`],
-                    [`${e ? '⭐ ' : ''}מועדפים`, `${e ? 'ℹ️ ' : ''}עזרה`]
+                    [`${e ? '⭐ ' : ''}מועדפים`, `${e ? '🔔 ' : ''}התראות`],
+                    [`${e ? 'ℹ️ ' : ''}עזרה`]
                 ],
                 resize_keyboard: true,
                 one_time_keyboard: false
@@ -369,6 +370,68 @@ class KeyboardManager {
                         { text: `${e ? '📤 ' : ''}שיתופים`, callback_data: `stats_shares_${postId}` }
                     ],
                     [{ text: `${e ? '🔙 ' : ''}חזרה`, callback_data: `back_to_post_${postId}` }]
+                ]
+            }
+        };
+    }
+
+    // 🔔 תפריט התראות
+    getAlertsMenuKeyboard() {
+        const e = this.emojis;
+        
+        return {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: `${e ? '➕ ' : ''}הוסף מילת מפתח`, callback_data: 'alert_add_keyword' }],
+                    [{ text: `${e ? '📋 ' : ''}הצג מילות מפתח`, callback_data: 'alert_show_keywords' }],
+                    [{ text: `${e ? '🗑️ ' : ''}מחק מילת מפתח`, callback_data: 'alert_remove_keyword' }],
+                    [{ text: `${e ? '🔄 ' : ''}החלף את כל המילות`, callback_data: 'alert_replace_all' }],
+                    [{ text: `${e ? '🔙 ' : ''}תפריט ראשי`, callback_data: 'back_to_main' }]
+                ]
+            }
+        };
+    }
+
+    // 🔔 כפתורי ניהול מילות מפתח
+    getKeywordManagementKeyboard(keywords = []) {
+        const e = this.emojis;
+        const buttons = [];
+        
+        // יצירת כפתורים למילות המפתח הקיימות
+        for (let i = 0; i < keywords.length; i += 2) {
+            const row = [];
+            row.push({ 
+                text: `❌ ${keywords[i].keyword}`, 
+                callback_data: `alert_delete_${keywords[i].keyword.substring(0, 20)}` 
+            });
+            
+            if (keywords[i + 1]) {
+                row.push({ 
+                    text: `❌ ${keywords[i + 1].keyword}`, 
+                    callback_data: `alert_delete_${keywords[i + 1].keyword.substring(0, 20)}` 
+                });
+            }
+            buttons.push(row);
+        }
+        
+        // הוספת כפתור חזרה
+        buttons.push([{ text: `${e ? '🔙 ' : ''}חזרה להתראות`, callback_data: 'alert_menu' }]);
+        
+        return {
+            reply_markup: {
+                inline_keyboard: buttons
+            }
+        };
+    }
+
+    // כפתור ביטול פעולה
+    getCancelKeyboard() {
+        const e = this.emojis;
+        
+        return {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: `${e ? '❌ ' : ''}ביטול`, callback_data: 'cancel_operation' }]
                 ]
             }
         };
