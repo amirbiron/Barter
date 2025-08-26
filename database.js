@@ -228,7 +228,7 @@ class Database {
         return new Promise((resolve, reject) => {
             const sql = `
                 SELECT * FROM posts 
-                WHERE user_id = ? AND is_active = 1 
+                WHERE user_id = ?
                 ORDER BY created_at DESC
             `;
             this.db.all(sql, [userId], (err, rows) => {

@@ -378,21 +378,23 @@ class UserHandler {
             const success = await db.togglePost(postId, userId);
             
             if (success) {
-                const newStatus = post.is_active ? 'הוקפאה' : 'הופעלה';
+                // הסטטוס החדש הוא ההפך מהסטטוס הנוכחי
+                const newIsActive = !post.is_active;
+                const newStatus = newIsActive ? 'הופעלה' : 'הוקפאה';
                 const e = this.emojis;
                 
                 await this.bot.answerCallbackQuery(callbackQuery.id, 
                     `${e ? '✅' : ''} המודעה ${newStatus} בהצלחה`
                 );
 
-                // עדכון הכפתורים
-                const newKeyboard = keyboards.getUserPostActionsKeyboard(postId, !post.is_active);
+                // עדכון הכפתורים עם הסטטוס החדש
+                const newKeyboard = keyboards.getUserPostActionsKeyboard(postId, newIsActive);
                 await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
                     chat_id: chatId,
                     message_id: callbackQuery.message.message_id
                 });
 
-                utils.logAction(userId, 'toggle_post', { postId, newStatus: !post.is_active });
+                utils.logAction(userId, 'toggle_post', { postId, newStatus: newIsActive });
             } else {
                 await this.bot.answerCallbackQuery(callbackQuery.id, 'שגיאה בעדכון המודעה');
             }
