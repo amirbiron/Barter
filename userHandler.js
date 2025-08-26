@@ -81,8 +81,8 @@ class UserHandler {
             
             if (!post || post.user_id !== userId) {
                 await this.bot.answerCallbackQuery(callbackQuery.id, {
-                text: `${this.emojis ? '❌' : ''} המודעה לא נמצאה או שאין לכם הרשאה לערוך אותה`,
-                show_alert: false
+                text: `${this.emojis ? '❌' : ''} המודעה לא קיימת במערכת. ייתכן שנמחקה.`,
+                show_alert: true
             });
                 return;
             }
