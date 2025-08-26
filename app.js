@@ -42,10 +42,13 @@ function getUserState(userId) {
 
 function setUserState(userId, state) {
     userStates.set(userId, state);
+    // שמירה מתמשכת (async, לא חוסם)
+    db.setPersistentUserState(userId, state).catch(() => {});
 }
 
 function clearUserState(userId) {
     userStates.delete(userId);
+    db.clearPersistentUserState(userId).catch(() => {});
 }
 
 // יצירת מקלדות - עכשיו מ-keyboards.js
@@ -207,8 +210,20 @@ bot.on('message', async (msg) => {
     console.log(`📨 קיבלתי הודעה מ-${userId}: "${text}"`);
     console.log(`🔧 config.bot.useEmojis = ${config.bot.useEmojis}`);
     
-    // בדיקת מצב המשתמש
-    const userState = getUserState(userId);
+    // בדיקת מצב משתמש - נסה לשחזר מה-DB אם צריך
+    let userState = getUserState(userId);
+    if (!userStates.has(userId)) {
+        try {
+            const persisted = await db.getPersistentUserState(userId);
+            if (persisted) {
+                userStates.set(userId, persisted);
+                userState = persisted;
+                console.log(`♻️ שוחזר מצב משתמש מה-DB:`, userState);
+            }
+        } catch (e) {
+            // ignore
+        }
+    }
     console.log(`👤 מצב משתמש ${userId}:`, userState);
     
     try {
@@ -743,6 +758,19 @@ bot.on('callback_query', async (callbackQuery) => {
     const chatId = msg.chat.id;
     const userId = callbackQuery.from.id;
     const data = callbackQuery.data;
+    
+    // שחזור מצב משתמש אם לא קיים בזיכרון
+    if (!userStates.has(userId)) {
+        try {
+            const persisted = await db.getPersistentUserState(userId);
+            if (persisted) {
+                userStates.set(userId, persisted);
+                console.log(`♻️ שוחזר מצב משתמש מה-DB (callback):`, persisted);
+            }
+        } catch (e) {
+            // ignore
+        }
+    }
     
     try {
         await bot.answerCallbackQuery(callbackQuery.id);
