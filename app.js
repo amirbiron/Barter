@@ -802,8 +802,10 @@ bot.on('callback_query', async (callbackQuery) => {
                         }
                     };
                     
-                    // Send as a new message to keep the original alert intact
-                    await bot.sendMessage(chatId, postMessage, {
+                    // Edit the original alert message in-place
+                    await bot.editMessageText(postMessage, {
+                        chat_id: chatId,
+                        message_id: msg.message_id,
                         parse_mode: 'Markdown',
                         ...keyboard
                     });
