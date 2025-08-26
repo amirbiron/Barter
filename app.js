@@ -662,15 +662,20 @@ async function handleBrowseSelection(chatId, data, messageId = null, page = 1) {
         currentPosts.forEach((post, index) => {
             const number = startIndex + index + 1;
             const title = post.title.length > 40 ? post.title.substring(0, 37) + '...' : post.title;
-            const author = post.first_name || post.username || 'אנונימי';
             
-            // Add free emoji if it's a free post
+            // Add emoji based on pricing mode
             let emoji = '';
             if (post.pricing_mode === 'free' || (post.pricing_mode === 'both' && post.price_range && post.price_range.includes('חינם'))) {
                 emoji = config.bot.useEmojis ? '🆓 ' : '[חינם] ';
+            } else if (post.pricing_mode === 'payment') {
+                emoji = config.bot.useEmojis ? '💰 ' : '[תשלום] ';
+            } else if (post.pricing_mode === 'barter') {
+                emoji = config.bot.useEmojis ? '🔄 ' : '[בארטר] ';
+            } else if (post.pricing_mode === 'both') {
+                emoji = config.bot.useEmojis ? '💱 ' : '[שניהם] ';
             }
             
-            message += `${number}. ${emoji}${title} - ${author}\n`;
+            message += `${number}. ${emoji}${title}\n`;
         });
         
         message += '\n_לחצו על מספר כדי לראות את המודעה המלאה_';
