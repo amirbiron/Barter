@@ -373,6 +373,63 @@ bot.on('callback_query', async (callbackQuery) => {
         // ניתוב לפי סוג הפעולה
         if (data.startsWith('pricing_')) {
             await handlePricingSelection(chatId, userId, data);
+        } else if (data.startsWith('view_post_')) {
+            // New handler for viewing posts from browse list
+            const parts = data.split('_');
+            const postId = parseInt(parts[2]);
+            const fromBrowse = parts[3] === 'from';
+            
+            if (fromBrowse) {
+                // Extract browse context (browse type and page)
+                const browseType = parts[5];
+                const page = parts[6] || 1;
+                
+                const post = await db.getPost(postId);
+                
+                if (post && post.is_active) {
+                    const postMessage = formatPostMessage(post);
+                    
+                    // Create custom keyboard with back to browse button
+                    const e = config.bot.useEmojis;
+                    const keyboard = {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
+                                    { text: `${e ? '⭐ ' : ''}שמור`, callback_data: `save_${postId}` }
+                                ],
+                                [
+                                    { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
+                                    { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
+                                ],
+                                [{ text: `${e ? '🔙 ' : ''}חזרה לרשימה`, callback_data: `browse_${browseType}_page_${page}` }]
+                            ]
+                        }
+                    };
+                    
+                    await bot.editMessageText(postMessage, {
+                        chat_id: chatId,
+                        message_id: msg.message_id,
+                        parse_mode: 'Markdown',
+                        ...keyboard
+                    });
+                    
+                    // Track view
+                    userHandler.trackInteraction(userId, postId, 'view');
+                } else {
+                    await bot.answerCallbackQuery(callbackQuery.id, {
+                        text: 'המודעה לא נמצאה',
+                        show_alert: false
+                    });
+                }
+            }
+        } else if (data === 'back_to_browse_options') {
+            // Return to browse options menu
+            await bot.editMessageText('📱 איך תרצו לדפדף?', {
+                chat_id: chatId,
+                message_id: msg.message_id,
+                ...getBrowseKeyboard()
+            });
         } else if (data.startsWith('browse_')) {
             // בדיקה אם זה חזרה למודעה ספציפית
             if (data.startsWith('browse_post_')) {
@@ -395,7 +452,7 @@ bot.on('callback_query', async (callbackQuery) => {
             });
                 }
             } else {
-                await handleBrowseSelection(chatId, data);
+                await handleBrowseSelection(chatId, data, msg.message_id);
             }
         } else if (data.startsWith('contact_')) {
             await userHandler.handleContactRequest(callbackQuery);
@@ -541,6 +598,10 @@ async function handlePricingSelection(chatId, userId, data) {
     if (pricingMode === 'payment' || pricingMode === 'both') {
         await bot.sendMessage(chatId, '💵 הקלידו את טווח המחיר (דוגמא: "100-500 ש״ח" או הקלידו "דלג"):');
         setUserState(userId, { ...userState, step: 'price_range', pricing_mode: pricingMode });
+    } else if (pricingMode === 'free') {
+        // For free posts, set price_range to "חינם" and skip price input
+        await bot.sendMessage(chatId, '🔗 הוסיפו קישורים לתיק עבודות או דף נחיתה (או הקלידו "דלג"):');
+        setUserState(userId, { ...userState, step: 'portfolio', pricing_mode: pricingMode, price_range: 'חינם' });
     } else {
         await bot.sendMessage(chatId, '🔗 הוסיפו קישורים לתיק עבודות או דף נחיתה (או הקלידו "דלג"):');
         setUserState(userId, { ...userState, step: 'portfolio', pricing_mode: pricingMode });
@@ -549,8 +610,15 @@ async function handlePricingSelection(chatId, userId, data) {
     utils.logAction(userId, 'select_pricing', { mode: pricingMode });
 }
 
-async function handleBrowseSelection(chatId, data) {
-    const browseType = data.replace('browse_', '');
+async function handleBrowseSelection(chatId, data, messageId = null, page = 1) {
+    const parts = data.split('_');
+    let browseType = parts[1];
+    
+    // Handle pagination
+    if (parts.length >= 4 && parts[2] === 'page') {
+        page = parseInt(parts[3]);
+        browseType = parts[1];
+    }
     
     try {
         let filter = {};
@@ -558,39 +626,135 @@ async function handleBrowseSelection(chatId, data) {
             filter.pricingMode = browseType;
         }
         
-        const posts = await db.getRecentPosts(config.content.maxBrowseResults, filter);
+        // Get all posts for this filter
+        const allPosts = await db.getRecentPosts(100, filter); // Get more posts for pagination
         
-        if (posts.length === 0) {
-            await bot.sendMessage(chatId, '📱 אין מודעות זמינות בקטגוריה זו כרגע.');
+        if (allPosts.length === 0) {
+            const message = '📱 אין מודעות זמינות בקטגוריה זו כרגע.';
+            if (messageId) {
+                await bot.editMessageText(message, {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    ...keyboards.getBrowseKeyboard()
+                });
+            } else {
+                await bot.sendMessage(chatId, message, keyboards.getBrowseKeyboard());
+            }
             return;
         }
         
         const categoryName = browseType === 'all' ? 'כל המודעות' :
-                           browseType === 'barter' ? 'מודעות בארטר' : 'מודעות בתשלום';
+                           browseType === 'barter' ? 'מודעות בארטר' : 
+                           browseType === 'payment' ? 'מודעות בתשלום' :
+                           browseType === 'free' ? 'מודעות חינם' : 'מודעות';
         
-        await bot.sendMessage(chatId, `📱 *${categoryName} (${posts.length} אחרונות):*`, { 
-            parse_mode: 'Markdown' 
+        // Pagination settings
+        const postsPerPage = 8;
+        const totalPages = Math.ceil(allPosts.length / postsPerPage);
+        const startIndex = (page - 1) * postsPerPage;
+        const endIndex = Math.min(startIndex + postsPerPage, allPosts.length);
+        const currentPosts = allPosts.slice(startIndex, endIndex);
+        
+        // Build the message with numbered titles
+        let message = `📱 *${categoryName}*\n`;
+        message += `📄 עמוד ${page} מתוך ${totalPages}\n\n`;
+        
+        currentPosts.forEach((post, index) => {
+            const number = startIndex + index + 1;
+            const title = post.title.length > 40 ? post.title.substring(0, 37) + '...' : post.title;
+            
+            // Add emoji based on pricing mode
+            let emoji = '';
+            if (post.pricing_mode === 'free' || (post.pricing_mode === 'both' && post.price_range && post.price_range.includes('חינם'))) {
+                emoji = config.bot.useEmojis ? '🆓 ' : '[חינם] ';
+            } else if (post.pricing_mode === 'payment') {
+                emoji = config.bot.useEmojis ? '💰 ' : '[תשלום] ';
+            } else if (post.pricing_mode === 'barter') {
+                emoji = config.bot.useEmojis ? '🤝 ' : '[בארטר] ';
+            } else if (post.pricing_mode === 'both') {
+                emoji = config.bot.useEmojis ? '💰🤝 ' : '[שניהם] ';
+            }
+            
+            message += `${number}. ${emoji}${title}\n`;
         });
         
-        for (const post of posts) {
-            const message = formatPostMessage(post);
-            await bot.sendMessage(chatId, message, {
-                parse_mode: 'Markdown',
-                ...getPostActionsKeyboard(post.id)
-            });
-            
-            // מעקב אחרי צפיות
-            userHandler.trackInteraction(0, post.id, 'views'); // 0 = system user
-            
-            // השהייה קטנה למניעת spam
-            await utils.sleep(100);
+        message += '\n_לחצו על מספר כדי לראות את המודעה המלאה_';
+        
+        // Create inline keyboard with post numbers and navigation
+        const keyboard = [];
+        
+        // Post selection buttons (2 rows of 4)
+        for (let row = 0; row < 2; row++) {
+            const rowButtons = [];
+            for (let col = 0; col < 4; col++) {
+                const index = row * 4 + col;
+                if (index < currentPosts.length) {
+                    const post = currentPosts[index];
+                    const buttonNumber = startIndex + index + 1;
+                    rowButtons.push({
+                        text: `${buttonNumber}`,
+                        callback_data: `view_post_${post.id}_from_browse_${browseType}_${page}`
+                    });
+                }
+            }
+            if (rowButtons.length > 0) {
+                keyboard.push(rowButtons);
+            }
         }
         
-        utils.logAction(chatId, 'browse', { type: browseType, resultsCount: posts.length });
+        // Navigation row
+        const navRow = [];
+        const e = config.bot.useEmojis;
+        
+        if (page > 1) {
+            navRow.push({ text: e ? '◀️ הקודם' : '< הקודם', callback_data: `browse_${browseType}_page_${page - 1}` });
+        }
+        
+        navRow.push({ text: `${page}/${totalPages}`, callback_data: 'noop' });
+        
+        if (page < totalPages) {
+            navRow.push({ text: e ? 'הבא ▶️' : 'הבא >', callback_data: `browse_${browseType}_page_${page + 1}` });
+        }
+        
+        keyboard.push(navRow);
+        
+        // Back to browse options
+        keyboard.push([{ text: e ? '🔙 חזרה לאפשרויות דפדוף' : 'חזרה לאפשרויות דפדוף', callback_data: 'back_to_browse_options' }]);
+        
+        const replyMarkup = {
+            reply_markup: {
+                inline_keyboard: keyboard
+            }
+        };
+        
+        // Send or edit the message
+        if (messageId) {
+            await bot.editMessageText(message, {
+                chat_id: chatId,
+                message_id: messageId,
+                parse_mode: 'Markdown',
+                ...replyMarkup
+            });
+        } else {
+            await bot.sendMessage(chatId, message, {
+                parse_mode: 'Markdown',
+                ...replyMarkup
+            });
+        }
+        
+        utils.logAction(chatId, 'browse', { type: browseType, page, resultsCount: allPosts.length });
         
     } catch (error) {
         utils.logError(error, 'browse_selection');
-        await bot.sendMessage(chatId, config.messages.error);
+        const errorMessage = config.messages.error;
+        if (messageId) {
+            await bot.editMessageText(errorMessage, {
+                chat_id: chatId,
+                message_id: messageId
+            });
+        } else {
+            await bot.sendMessage(chatId, errorMessage);
+        }
     }
 }
 

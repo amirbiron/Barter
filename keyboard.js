@@ -54,7 +54,10 @@ class KeyboardManager {
                         { text: `${e ? '🔄 ' : ''}בארטר`, callback_data: 'browse_barter' },
                         { text: `${e ? '💰 ' : ''}תשלום`, callback_data: 'browse_payment' }
                     ],
-                    [{ text: `${e ? '📋 ' : ''}הכל`, callback_data: 'browse_all' }],
+                    [
+                        { text: `${e ? '🆓 ' : ''}חינם`, callback_data: 'browse_free' },
+                        { text: `${e ? '📋 ' : ''}הכל`, callback_data: 'browse_all' }
+                    ],
                     [{ text: `${e ? '🔙 ' : ''}תפריט ראשי`, callback_data: 'back_to_main' }]
                 ]
             }
