@@ -456,6 +456,20 @@ class Database {
         });
     }
 
+    // מחיקת מודעה על ידי מנהל (ללא בדיקת בעלות)
+    adminDeletePost(postId) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                DELETE FROM posts 
+                WHERE id = ?
+            `;
+            this.db.run(sql, [postId], function(err) {
+                if (err) reject(err);
+                else resolve(this.changes > 0);
+            });
+        });
+    }
+
     // הפעלה/הקפאה של מודעה
     togglePost(postId, userId) {
         return new Promise((resolve, reject) => {

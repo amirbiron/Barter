@@ -61,8 +61,9 @@ function getBrowseKeyboard() {
     return keyboards.getBrowseKeyboard();
 }
 
-function getPostActionsKeyboard(postId) {
-    return keyboards.getPostActionsKeyboard(postId);
+function getPostActionsKeyboard(postId, userId) {
+    const isAdmin = config.isAdmin(userId);
+    return keyboards.getPostActionsKeyboardForAdmin(postId, isAdmin);
 }
 
 // עיצוב הודעת מודעה - עכשיו מ-utils.js
@@ -122,7 +123,7 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
                 const postMessage = formatPostMessage(post);
                 await bot.sendMessage(chatId, postMessage, {
                     parse_mode: 'Markdown',
-                    ...getPostActionsKeyboard(postId)
+                    ...getPostActionsKeyboard(postId, userId)
                 });
                 
                 // עדכון צפיות
@@ -635,7 +636,7 @@ async function handleSearch(chatId, query) {
             const message = formatPostMessage(post);
             await bot.sendMessage(chatId, message, {
                 parse_mode: 'Markdown',
-                ...getPostActionsKeyboard(post.id)
+                ...getPostActionsKeyboard(post.id, userId)
             });
             
             // מעקב אחרי צפיות
@@ -786,7 +787,7 @@ bot.on('callback_query', async (callbackQuery) => {
                     // Send as new message with full post actions keyboard
                     await bot.sendMessage(chatId, postMessage, {
                         parse_mode: 'Markdown',
-                        ...getPostActionsKeyboard(postId)
+                        ...getPostActionsKeyboard(postId, userId)
                     });
                     
                     // Track view
@@ -818,7 +819,7 @@ bot.on('callback_query', async (callbackQuery) => {
                         chat_id: chatId,
                         message_id: msg.message_id,
                         parse_mode: 'Markdown',
-                        ...getPostActionsKeyboard(postId)
+                        ...getPostActionsKeyboard(postId, userId)
                     });
                     userHandler.trackInteraction(userId, postId, 'view');
                 } else {
@@ -878,7 +879,7 @@ bot.on('callback_query', async (callbackQuery) => {
                         chat_id: chatId,
                         message_id: msg.message_id,
                         parse_mode: 'Markdown',
-                        ...getPostActionsKeyboard(postId)
+                        ...getPostActionsKeyboard(postId, userId)
                     });
                 }
                 
@@ -973,6 +974,108 @@ bot.on('callback_query', async (callbackQuery) => {
                 
                 // רענן את הרשימה
                 await handleRemoveKeyword(chatId, userId);
+            } else if (data.startsWith('share_own_')) {
+                await userHandler.handleSharePost(callbackQuery);
+            } else if (data.startsWith('admin_delete_')) {
+                // מחיקת מודעה על ידי מנהל
+                if (!config.isAdmin(userId)) {
+                    await bot.answerCallbackQuery(callbackQuery.id, {
+                        text: 'אין לך הרשאות מנהל',
+                        show_alert: true
+                    });
+                    return;
+                }
+                
+                const postId = parseInt(data.replace('admin_delete_', ''));
+                
+                // הצג אישור למחיקה
+                const confirmKeyboard = {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                { text: '✅ אשר מחיקה', callback_data: `confirm_admin_delete_${postId}` },
+                                { text: '❌ ביטול', callback_data: `view_${postId}` }
+                            ]
+                        ]
+                    }
+                };
+                
+                await bot.editMessageText(
+                    '⚠️ *אזהרה: מחיקת מודעה*\n\n' +
+                    'האם אתה בטוח שברצונך למחוק את המודעה?\n' +
+                    'פעולה זו לא ניתנת לביטול.',
+                    {
+                        chat_id: chatId,
+                        message_id: msg.message_id,
+                        parse_mode: 'Markdown',
+                        ...confirmKeyboard
+                    }
+                );
+            } else if (data.startsWith('confirm_admin_delete_')) {
+                // אישור מחיקת מודעה על ידי מנהל
+                if (!config.isAdmin(userId)) {
+                    await bot.answerCallbackQuery(callbackQuery.id, {
+                        text: 'אין לך הרשאות מנהל',
+                        show_alert: true
+                    });
+                    return;
+                }
+                
+                const postId = parseInt(data.replace('confirm_admin_delete_', ''));
+                const post = await db.getPost(postId);
+                
+                if (post) {
+                    const success = await db.adminDeletePost(postId);
+                    
+                    if (success) {
+                        await bot.editMessageText(
+                            '✅ *המודעה נמחקה בהצלחה*\n\n' +
+                            `המודעה "${utils.truncateText(post.title, 50)}" הוסרה מהמערכת.`,
+                            {
+                                chat_id: chatId,
+                                message_id: msg.message_id,
+                                parse_mode: 'Markdown',
+                                reply_markup: {
+                                    inline_keyboard: [
+                                        [{ text: '🔙 חזרה לתפריט ראשי', callback_data: 'back_to_main' }]
+                                    ]
+                                }
+                            }
+                        );
+                        
+                        utils.logAction(userId, 'admin_delete_post', { postId, postTitle: post.title });
+                    } else {
+                        await bot.answerCallbackQuery(callbackQuery.id, {
+                            text: 'שגיאה במחיקת המודעה',
+                            show_alert: true
+                        });
+                    }
+                } else {
+                    await bot.answerCallbackQuery(callbackQuery.id, {
+                        text: 'המודעה לא נמצאה',
+                        show_alert: true
+                    });
+                }
+            } else if (data.startsWith('view_')) {
+                // צפייה במודעה (לאחר ביטול מחיקה)
+                const postId = parseInt(data.replace('view_', ''));
+                const post = await db.getPost(postId);
+                
+                if (post && post.is_active) {
+                    const postMessage = formatPostMessage(post);
+                    await bot.editMessageText(postMessage, {
+                        chat_id: chatId,
+                        message_id: msg.message_id,
+                        parse_mode: 'Markdown',
+                        ...getPostActionsKeyboard(postId, userId)
+                    });
+                    userHandler.trackInteraction(userId, postId, 'view');
+                } else {
+                    await bot.answerCallbackQuery(callbackQuery.id, {
+                        text: 'המודעה לא נמצאה',
+                        show_alert: true
+                    });
+                }
             }
         } else if (data === 'cancel_operation') {
             // ביטול פעולה
