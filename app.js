@@ -381,6 +381,24 @@ bot.on('message', async (msg) => {
 
 // פונקציות עיקריות
 async function startPostCreation(chatId, userId) {
+    // בדיקת מגבלת מודעות למשתמש
+    const userPosts = await db.getUserPosts(userId);
+    const activePostsCount = userPosts.filter(post => !post.deleted_at).length;
+    
+    if (activePostsCount >= config.content.maxPostsPerUser) {
+        await bot.sendMessage(chatId, 
+            `❌ *הגעתם למגבלת המודעות המותרת*\n\n` +
+            `מותר לפרסם עד ${config.content.maxPostsPerUser} מודעות פעילות.\n` +
+            `יש לכם כרגע ${activePostsCount} מודעות פעילות.\n\n` +
+            `כדי לפרסם מודעה חדשה, מחקו או הקפיאו אחת מהמודעות הקיימות.`, 
+            { 
+                parse_mode: 'Markdown',
+                ...getMainKeyboard()
+            }
+        );
+        return;
+    }
+    
     await bot.sendMessage(chatId, '📝 *בואו ניצור מודעה חדשה!*\n\nהקלידו את כותרת השירות:', { 
         parse_mode: 'Markdown' 
     });

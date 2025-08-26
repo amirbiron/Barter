@@ -78,7 +78,7 @@ class Config {
             maxTags: parseInt(process.env.MAX_TAGS) || 10,
             maxSearchResults: parseInt(process.env.MAX_SEARCH_RESULTS) || 10,
             maxBrowseResults: parseInt(process.env.MAX_BROWSE_RESULTS) || 15,
-            maxPostsPerUser: parseInt(process.env.MAX_POSTS_PER_USER) || 20,
+            maxPostsPerUser: parseInt(process.env.MAX_POSTS_PER_USER) || 3,
             deletedPostsRetentionDays: parseInt(process.env.DELETED_POSTS_RETENTION_DAYS) || 30
         };
 
