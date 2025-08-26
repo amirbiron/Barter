@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "init-db": "node database.js"
+    "init-db": "node database.js",
+    "smoke": "node scripts/smoke.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
