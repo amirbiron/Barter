@@ -808,6 +808,13 @@ bot.on('callback_query', async (callbackQuery) => {
                 message_id: msg.message_id,
                 ...getBrowseKeyboard()
             });
+        } else if (data === 'back_to_browse') {
+            // Normalize legacy back button to browse options
+            await bot.editMessageText('📱 איך תרצו לדפדף?', {
+                chat_id: chatId,
+                message_id: msg.message_id,
+                ...getBrowseKeyboard()
+            });
         } else if (data.startsWith('browse_')) {
             // בדיקה אם זה חזרה למודעה ספציפית
             if (data.startsWith('browse_post_')) {
@@ -1455,7 +1462,7 @@ async function checkAndSendAlerts(postId, postTitle, postDescription, postUserId
                         reply_markup: {
                             inline_keyboard: [
                                 [
-                                    { text: '👁️ צפה במודעה', callback_data: `view_${postId}` },
+                                    { text: '👁️ צפה במודעה', callback_data: `view_post_${postId}` },
                                     { text: '⭐ שמור', callback_data: `save_${postId}` }
                                 ]
                             ]
