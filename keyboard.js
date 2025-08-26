@@ -201,19 +201,28 @@ class KeyboardManager {
         const buttons = [];
         
         // זיהוי סוג פרטי הקשר והוספת כפתורים מתאימים
-        if (contactInfo.includes('@') && !contactInfo.includes(' ')) {
-            // נראה כמו אימייל
-            buttons.push([{ text: `${e ? '📧 ' : ''}שלח אימייל`, url: `mailto:${contactInfo}` }]);
+        
+        // בדיקה אם זה אימייל (מכיל @ ונקודה אחרי ה-@)
+        if (contactInfo.includes('@') && contactInfo.includes('.') && !contactInfo.includes(' ')) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (emailRegex.test(contactInfo)) {
+                buttons.push([{ text: `${e ? '📧 ' : ''}שלח אימייל`, url: `mailto:${contactInfo}` }]);
+            }
         }
         
+        // בדיקה אם זה טלפון
         if (contactInfo.includes('+') || /\d{3}-?\d{3}-?\d{4}/.test(contactInfo)) {
             // נראה כמו טלפון
             buttons.push([{ text: `${e ? '📱 ' : ''}התקשר`, url: `tel:${contactInfo.replace(/\D/g, '')}` }]);
         }
         
-        if (contactInfo.includes('t.me/') || contactInfo.includes('@')) {
-            // נראה כמו טלגרם
-            const username = contactInfo.replace('t.me/', '').replace('@', '');
+        // בדיקה אם זה טלגרם (t.me או @ אבל לא אימייל)
+        if (contactInfo.includes('t.me/')) {
+            const username = contactInfo.replace('https://t.me/', '').replace('t.me/', '');
+            buttons.push([{ text: `${e ? '💬 ' : ''}פנה בטלגרם`, url: `https://t.me/${username}` }]);
+        } else if (contactInfo.startsWith('@')) {
+            // אם מתחיל ב-@ זה שם משתמש טלגרם
+            const username = contactInfo.replace('@', '');
             buttons.push([{ text: `${e ? '💬 ' : ''}פנה בטלגרם`, url: `https://t.me/${username}` }]);
         }
         

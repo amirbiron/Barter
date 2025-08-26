@@ -383,9 +383,10 @@ class UserHandler {
                 const newStatus = newIsActive ? 'הופעלה' : 'הוקפאה';
                 const e = this.emojis;
                 
-                await this.bot.answerCallbackQuery(callbackQuery.id, 
-                    `${e ? '✅' : ''} המודעה ${newStatus} בהצלחה`
-                );
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                    text: `${e ? '✅' : ''} המודעה ${newStatus} בהצלחה`,
+                    show_alert: false
+                });
 
                 // עדכון הכפתורים עם הסטטוס החדש
                 const newKeyboard = keyboards.getUserPostActionsKeyboard(postId, newIsActive);
@@ -396,7 +397,10 @@ class UserHandler {
 
                 utils.logAction(userId, 'toggle_post', { postId, newStatus: newIsActive });
             } else {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'שגיאה בעדכון המודעה');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                    text: 'שגיאה בעדכון המודעה',
+                    show_alert: true
+                });
             }
 
         } catch (error) {
@@ -508,9 +512,10 @@ class UserHandler {
                 ...keyboard
             });
 
-            await this.bot.answerCallbackQuery(callbackQuery.id, 
-                `${this.emojis ? '📞' : ''} פרטי קשר נחשפו`
-            );
+            await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: `${this.emojis ? '📞' : ''} פרטי קשר נחשפו`,
+                show_alert: false
+            });
 
             utils.logAction(userId, 'view_contact', { postId, postOwner: post.user_id });
 
@@ -532,22 +537,25 @@ class UserHandler {
             if (isSaved) {
                 // הסרה מהמועדפים
                 await db.unsavePost(userId, postId);
-                await this.bot.answerCallbackQuery(callbackQuery.id, 
-                    `${this.emojis ? '💔' : ''} המודעה הוסרה מהמועדפים`
-                );
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                    text: `${this.emojis ? '💔' : ''} המודעה הוסרה מהמועדפים`,
+                    show_alert: false
+                });
                 utils.logAction(userId, 'unsave_post', { postId });
             } else {
                 // הוספה למועדפים
                 const result = await db.savePost(userId, postId);
                 if (result.saved) {
-                    await this.bot.answerCallbackQuery(callbackQuery.id, 
-                        `${this.emojis ? '⭐' : ''} המודעה נשמרה למועדפים!`
-                    );
+                    await this.bot.answerCallbackQuery(callbackQuery.id, {
+                        text: `${this.emojis ? '⭐' : ''} המודעה נשמרה למועדפים!`,
+                        show_alert: false
+                    });
                     utils.logAction(userId, 'save_post', { postId });
                 } else {
-                    await this.bot.answerCallbackQuery(callbackQuery.id, 
-                        `${this.emojis ? '⚠️' : ''} המודעה כבר שמורה במועדפים`
-                    );
+                    await this.bot.answerCallbackQuery(callbackQuery.id, {
+                        text: `${this.emojis ? '⚠️' : ''} המודעה כבר שמורה במועדפים`,
+                        show_alert: false
+                    });
                 }
             }
             
