@@ -179,7 +179,7 @@ bot.on('message', async (msg) => {
                         keyboard: [
                             ['📌 חיפוש בכותרות בלבד'],
                             ['🔍 חיפוש מלא (כותרת + תיאור + תגיות)'],
-                            ['❌ ביטול']
+                            ['🔙 חזרה']
                         ],
                         resize_keyboard: true,
                         one_time_keyboard: true
@@ -193,7 +193,7 @@ bot.on('message', async (msg) => {
                     console.log('📌 נבחר חיפוש בכותרות');
                     await bot.sendMessage(chatId, '📌 הקלידו מילות מפתח לחיפוש בכותרות:', {
                         reply_markup: {
-                            keyboard: [['❌ ביטול']],
+                            keyboard: [['🔙 חזרה']],
                             resize_keyboard: true,
                             one_time_keyboard: true
                         }
@@ -209,7 +209,7 @@ bot.on('message', async (msg) => {
                     console.log('🔍 נבחר חיפוש מלא');
                     await bot.sendMessage(chatId, '🔍 הקלידו מילות מפתח לחיפוש מלא:', {
                         reply_markup: {
-                            keyboard: [['❌ ביטול']],
+                            keyboard: [['🔙 חזרה']],
                             resize_keyboard: true,
                             one_time_keyboard: true
                         }
@@ -243,8 +243,33 @@ bot.on('message', async (msg) => {
                 });
                 break;
                 
+            case '🔙 חזרה':
+                // חזרה לשלב הקודם או לתפריט הראשי
+                if (userState.step === 'search_type') {
+                    console.log('🔙 חזרה לתפריט ראשי מבחירת סוג חיפוש');
+                    clearUserState(userId);
+                    await bot.sendMessage(chatId, '✅ חזרה לתפריט ראשי', getMainKeyboard());
+                } else if (userState.step === 'search_titles' || userState.step === 'search_full') {
+                    console.log('🔙 חזרה לבחירת סוג חיפוש');
+                    await bot.sendMessage(chatId, '🔍 בחרו סוג חיפוש:', {
+                        reply_markup: {
+                            keyboard: [
+                                ['📌 חיפוש בכותרות בלבד'],
+                                ['🔍 חיפוש מלא (כותרת + תיאור + תגיות)'],
+                                ['🔙 חזרה']
+                            ],
+                            resize_keyboard: true,
+                            one_time_keyboard: true
+                        }
+                    });
+                    setUserState(userId, { step: 'search_type' });
+                } else {
+                    await bot.sendMessage(chatId, config.messages.unknownCommand, getMainKeyboard());
+                }
+                break;
+                
             case '❌ ביטול':
-                // ביטול חיפוש וחזרה לתפריט ראשי
+                // שמירה על תמיכה לאחור - אם מישהו עדיין משתמש בגרסה ישנה
                 if (userState.step === 'search' || userState.step === 'search_type' || 
                     userState.step === 'search_titles' || userState.step === 'search_full') {
                     console.log('❌ ביטול חיפוש');
