@@ -570,10 +570,16 @@ class UserHandler {
                 await db.unsavePost(userId, postId);
                 
                 // הודעה קופצת
-                await this.bot.answerCallbackQuery(callbackQuery.id, {
-                    text: `💔 המודעה הוסרה מהמועדפים`,
-                    show_alert: true
-                });
+                try {
+                    console.log('[DEBUG] Trying to show unsave alert...');
+                    await this.bot.answerCallbackQuery(callbackQuery.id, {
+                        text: `💔 המודעה הוסרה מהמועדפים`,
+                        show_alert: true
+                    });
+                    console.log('[DEBUG] Unsave alert shown successfully');
+                } catch (alertErr) {
+                    console.error('[DEBUG] Error showing unsave alert:', alertErr.message);
+                }
                 
                 utils.logAction(userId, 'unsave_post', { postId });
             } else {
@@ -581,17 +587,27 @@ class UserHandler {
                 const result = await db.savePost(userId, postId);
                 if (result.saved) {
                     // הודעה קופצת
-                    await this.bot.answerCallbackQuery(callbackQuery.id, {
-                        text: `⭐ המודעה נשמרה למועדפים!`,
-                        show_alert: true
-                    });
+                    try {
+                        console.log('[DEBUG] Trying to show save alert...');
+                        await this.bot.answerCallbackQuery(callbackQuery.id, {
+                            text: `⭐ המודעה נשמרה למועדפים!`,
+                            show_alert: true
+                        });
+                        console.log('[DEBUG] Save alert shown successfully');
+                    } catch (alertErr) {
+                        console.error('[DEBUG] Error showing save alert:', alertErr.message);
+                    }
                     
                     utils.logAction(userId, 'save_post', { postId });
                 } else {
-                    await this.bot.answerCallbackQuery(callbackQuery.id, {
-                        text: `⚠️ המודעה כבר שמורה במועדפים`,
-                        show_alert: true
-                    });
+                    try {
+                        await this.bot.answerCallbackQuery(callbackQuery.id, {
+                            text: `⚠️ המודעה כבר שמורה במועדפים`,
+                            show_alert: true
+                        });
+                    } catch (alertErr) {
+                        console.error('[DEBUG] Error showing already saved alert:', alertErr.message);
+                    }
                 }
             }
             
