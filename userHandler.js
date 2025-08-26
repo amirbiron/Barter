@@ -189,16 +189,31 @@ class UserHandler {
     getEditInstructions(field, post) {
         const e = this.emojis;
         
+        const pricingOptionsText = this.getPricingOptionsText(post.pricing_mode);
+        
         const instructions = {
             title: `${e ? '📝' : ''} *עריכת כותרת*\n\nכותרת נוכחית: "${post.title}"\n\nהקלידו כותרת חדשה:`,
             desc: `${e ? '📄' : ''} *עריכת תיאור*\n\nתיאור נוכחי: "${utils.truncateText(post.description, 200)}"\n\nהקלידו תיאור חדש:`,
-            pricing: `${e ? '💰' : ''} *עריכת מצב תמחור*\n\nמצב נוכחי: ${config.getPricingStyle(post.pricing_mode).name}\n\nבחרו מצב חדש: בארטר / תשלום`,
+            pricing: `${e ? '💰' : ''} *עריכת מצב תמחור*\n\nמצב נוכחי: ${config.getPricingStyle(post.pricing_mode).name}\n\nבחרו מצב חדש: ${pricingOptionsText}`,
             tags: `${e ? '🏷️' : ''} *עריכת תגיות*\n\nתגיות נוכחיות: ${utils.formatTags(post.tags)}\n\nהקלידו תגיות חדשות (מופרדות בפסיק):`,
             links: `${e ? '🔗' : ''} *עריכת קישורים*\n\nקישורים נוכחיים: ${post.portfolio_links || 'אין'}\n\nהקלידו קישורים חדשים:`,
             contact: `${e ? '📞' : ''} *עריכת פרטי קשר*\n\nפרטי קשר נוכחיים: "${post.contact_info}"\n\nהקלידו פרטי קשר חדשים:`
         };
 
         return instructions[field] || 'עריכה לא מוכרת';
+    }
+
+    getPricingOptionsText(currentMode) {
+        switch (currentMode) {
+            case 'barter':
+                return 'תשלום / בארטר או תשלום';
+            case 'payment':
+                return 'בארטר / בארטר או תשלום';
+            case 'both':
+                return 'בארטר / תשלום';
+            default:
+                return 'בארטר / תשלום';
+        }
     }
 
     async processEditInput(msg) {
