@@ -217,8 +217,8 @@ bot.on('message', async (msg) => {
     // תחזוקה גלובלית: חסימת אינטראקציות והצגת הודעה ידידותית
     if (isMaintenanceMode()) {
         await bot.sendMessage(chatId,
-            '🔧 הבוט בתהליך עדכון קצר כרגע...\n\n' +
-            'אנא נסו שוב בעוד כדקה...',
+            '🔧 הבוט בתהליך עדכון קצרצר כרגע...\n\n' +
+            'אנא נסו שוב בעוד כ10 - 30 שניות',
             getMainKeyboard()
         );
         return;
@@ -475,8 +475,8 @@ async function startPostCreation(chatId, userId) {
     // תחזוקה: חסימת יצירת מודעה בזמן דיפלוי/תחזוקה
     if (isMaintenanceMode()) {
         await bot.sendMessage(chatId,
-            '🔧 הבוט בתהליך עדכון קצר כרגע...\n\n' +
-            'אנא נסו שוב בעוד כדקה...',
+            '🔧 הבוט בתהליך עדכון קצרצר כרגע...\n\n' +
+            'אנא נסו שוב בעוד כ10 - 30 שניות',
             getMainKeyboard()
         );
         clearUserState(userId);
@@ -788,8 +788,8 @@ bot.on('callback_query', async (callbackQuery) => {
             });
         } catch (e) {}
         await bot.sendMessage(chatId,
-            '🔧 הבוט בתהליך עדכון קצר כרגע...\n\n' +
-            'אנא נסו שוב בעוד כדקה...',
+            '🔧 הבוט בתהליך עדכון קצרצר כרגע...\n\n' +
+            'אנא נסו שוב בעוד כ10 - 30 שניות',
             getMainKeyboard()
         );
         return;
