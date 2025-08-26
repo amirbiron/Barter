@@ -93,7 +93,6 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
             // הגדרת הפקודות למנהל
             await bot.setMyCommands([
                 { command: 'start', description: '🏠 התחלה מחדש' },
-                { command: 'help', description: '📖 עזרה ופקודות' },
                 { command: 'testpost', description: '🔧 יצירת מודעת בדיקה פרטית' }
             ], {
                 scope: {
