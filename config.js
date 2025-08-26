@@ -14,11 +14,11 @@ class Config {
     // בדיקת משתני סביבה חובה
     validateRequiredEnvVars() {
         const required = ['BOT_TOKEN'];
-        const missing = required.filter(key => !process.env[key]);
-        
+        const missing = required.filter((key) => !process.env[key]);
+
         if (missing.length > 0) {
             console.error('❌ משתני סביבה חסרים:');
-            missing.forEach(key => {
+            missing.forEach((key) => {
                 console.error(`   - ${key}`);
             });
             console.error('\n💡 בדקו את קובץ .env שלכם');
@@ -37,15 +37,21 @@ class Config {
             polling: {
                 timeout: parseInt(process.env.POLLING_TIMEOUT) || 10000,
                 interval: 1000,
-                autoStart: true
+                autoStart: true,
             },
             // רשימת מנהלים - תמיכה גם ב-ADMIN_IDS וגם ב-ADMIN_USER_IDS
             adminIds: (() => {
-                const parseIds = (s) => (s ? s.split(',').map(id => parseInt(id.trim())).filter(Boolean) : []);
+                const parseIds = (s) =>
+                    s
+                        ? s
+                              .split(',')
+                              .map((id) => parseInt(id.trim()))
+                              .filter(Boolean)
+                        : [];
                 const idsA = parseIds(process.env.ADMIN_IDS);
                 const idsB = parseIds(process.env.ADMIN_USER_IDS);
                 return Array.from(new Set([...idsA, ...idsB]));
-            })()
+            })(),
         };
 
         // 🗃️ הגדרות בסיס נתונים
@@ -55,12 +61,12 @@ class Config {
             path: (() => {
                 const path = require('path');
                 const fs = require('fs');
-                
+
                 // אם יש משתנה סביבה מפורש
                 if (process.env.DATABASE_PATH) {
                     return process.env.DATABASE_PATH;
                 }
-                
+
                 // אם אנחנו ב-Render
                 if (process.env.RENDER) {
                     const persistentPath = '/opt/render/project/data';
@@ -68,10 +74,10 @@ class Config {
                         return path.join(persistentPath, 'barter_bot.db');
                     }
                 }
-                
+
                 // ברירת מחדל
                 return path.join(__dirname, 'barter_bot.db');
-            })()
+            })(),
         };
 
         // 📊 הגדרות תוכן
@@ -82,33 +88,34 @@ class Config {
             maxSearchResults: parseInt(process.env.MAX_SEARCH_RESULTS) || 10,
             maxBrowseResults: parseInt(process.env.MAX_BROWSE_RESULTS) || 15,
             maxPostsPerUser: parseInt(process.env.MAX_POSTS_PER_USER) || 3,
-            deletedPostsRetentionDays: parseInt(process.env.DELETED_POSTS_RETENTION_DAYS) || 30
+            deletedPostsRetentionDays: parseInt(process.env.DELETED_POSTS_RETENTION_DAYS) || 30,
         };
 
         // 🔒 הגדרות אבטחה
         this.security = {
-            adminUserIds: process.env.ADMIN_USER_IDS ? 
-                process.env.ADMIN_USER_IDS.split(',').map(id => parseInt(id.trim())) : [],
+            adminUserIds: process.env.ADMIN_USER_IDS
+                ? process.env.ADMIN_USER_IDS.split(',').map((id) => parseInt(id.trim()))
+                : [],
             postsRequireApproval: process.env.POSTS_REQUIRE_APPROVAL === 'true',
             userStateMaxAge: parseInt(process.env.USER_STATE_MAX_AGE) || 60, // דקות
-            userStateCleanupInterval: parseInt(process.env.USER_STATE_CLEANUP_INTERVAL) || 3600 // שניות
+            userStateCleanupInterval: parseInt(process.env.USER_STATE_CLEANUP_INTERVAL) || 3600, // שניות
         };
 
         // 🌐 הגדרות שרת
         this.server = {
             port: parseInt(process.env.PORT) || 3000,
             nodeEnv: process.env.NODE_ENV || 'development',
-            timezone: process.env.TIMEZONE || 'Asia/Jerusalem'
+            timezone: process.env.TIMEZONE || 'Asia/Jerusalem',
         };
 
         // 🎨 הגדרות ממשק
         this.ui = {
             colors: {
                 barter: process.env.BARTER_COLOR || '#4CAF50',
-                payment: process.env.PAYMENT_COLOR || '#FF9800', 
+                payment: process.env.PAYMENT_COLOR || '#FF9800',
                 both: process.env.BOTH_COLOR || '#9C27B0',
-                free: process.env.FREE_COLOR || '#03A9F4'
-            }
+                free: process.env.FREE_COLOR || '#03A9F4',
+            },
         };
 
         // 📱 הגדרות פיצ'רים
@@ -120,12 +127,12 @@ class Config {
             enablePostToggling: true,
             enableContactSharing: true,
             enableReporting: true,
-            enableFavorites: true
+            enableFavorites: true,
         };
 
         // 👤 פרטי קשר
         this.contacts = {
-            developerHandle: process.env.DEVELOPER_HANDLE || '@moominAmir'
+            developerHandle: process.env.DEVELOPER_HANDLE || '@moominAmir',
         };
 
         // 📝 תבניות הודעות
@@ -156,7 +163,9 @@ class Config {
 
         // בדיקת טוקן בוט
         if (!this.bot.token.match(/^\d+:[A-Za-z0-9_-]{35}$/)) {
-            console.error('❌ טוקן בוט לא תקין. צורה נכונה: 123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11');
+            console.error(
+                '❌ טוקן בוט לא תקין. צורה נכונה: 123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11'
+            );
             console.error('💡 קבלו טוקן חדש מ-@BotFather');
         }
 
@@ -169,7 +178,7 @@ class Config {
     // תבניות הודעות
     getMessageTemplates() {
         const emojis = this.bot.useEmojis;
-        
+
         return {
             welcome: `
 ${emojis ? '🎯' : ''} *ברוכים הבאים לבוט הבארטר והשירותים!*
@@ -212,7 +221,7 @@ ${emojis ? '❓' : ''} *שאלות?* פנו למפתח: ${this.contacts.develope
 
             noUserPosts: `${emojis ? '📋' : ''} אין לכם מודעות פעילות.\n\nלחצו על \"${emojis ? '📝' : ''}פרסום שירות\" ליצירת מודעה ראשונה!`,
 
-            featureInDevelopment: `${emojis ? '🚧' : ''} התכונה עוד בפיתוח`
+            featureInDevelopment: `${emojis ? '🚧' : ''} התכונה עוד בפיתוח`,
         };
     }
 
@@ -235,11 +244,11 @@ ${emojis ? '❓' : ''} *שאלות?* פנו למפתח: ${this.contacts.develope
             const timestamp = new Date().toISOString();
             const levelEmoji = {
                 info: 'ℹ️',
-                warn: '⚠️', 
+                warn: '⚠️',
                 error: '❌',
-                debug: '🐛'
+                debug: '🐛',
             };
-            
+
             console.log(`[${timestamp}] ${levelEmoji[level] || 'ℹ️'} ${message}`);
         }
     }
@@ -286,23 +295,23 @@ ${emojis ? '❓' : ''} *שאלות?* פנו למפתח: ${this.contacts.develope
             barter: {
                 emoji: '🫱🏻‍🫲🏽',
                 name: 'בארטר',
-                color: this.ui.colors.barter
+                color: this.ui.colors.barter,
             },
             payment: {
                 emoji: '💰',
                 name: 'תשלום',
-                color: this.ui.colors.payment
+                color: this.ui.colors.payment,
             },
             both: {
                 emoji: '🫱🏻‍🫲🏽💰',
                 name: 'בארטר או תשלום',
-                color: this.ui.colors.both
+                color: this.ui.colors.both,
             },
             free: {
                 emoji: '🆓',
                 name: 'חינם',
-                color: this.ui.colors.free
-            }
+                color: this.ui.colors.free,
+            },
         };
 
         return styles[pricingMode] || styles.both;

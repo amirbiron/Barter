@@ -29,9 +29,5 @@ module.exports = {
         // Allow console in Node app
         'no-console': 'off',
     },
-    ignorePatterns: [
-        'node_modules/',
-        'barter_bot.db',
-    ],
+    ignorePatterns: ['node_modules/', 'barter_bot.db'],
 };
-
