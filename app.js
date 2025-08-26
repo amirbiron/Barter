@@ -215,7 +215,7 @@ bot.on('message', async (msg) => {
     const text = msg.text;
     
     // תחזוקה גלובלית: חסימת אינטראקציות והצגת הודעה ידידותית
-    if (process.env.MAINTENANCE_MODE === 'true') {
+    if (isMaintenanceMode()) {
         await bot.sendMessage(chatId,
             '🔧 הבוט בתהליך עדכון קצר כרגע...\n\n' +
             'אנא נסו שוב בעוד כדקה...',
@@ -473,7 +473,7 @@ bot.on('message', async (msg) => {
 // פונקציות עיקריות
 async function startPostCreation(chatId, userId) {
     // תחזוקה: חסימת יצירת מודעה בזמן דיפלוי/תחזוקה
-    if (process.env.MAINTENANCE_MODE === 'true') {
+    if (isMaintenanceMode()) {
         await bot.sendMessage(chatId,
             '🔧 הבוט בתהליך עדכון קצר כרגע...\n\n' +
             'אנא נסו שוב בעוד כדקה...',
@@ -513,7 +513,7 @@ async function handlePostCreation(msg, userState) {
     const text = msg.text;
     
     // תחזוקה: עצירת תהליך פרסום בזמן דיפלוי/תחזוקה
-    if (process.env.MAINTENANCE_MODE === 'true') {
+    if (isMaintenanceMode()) {
         await bot.sendMessage(chatId,
             '🔧 כרגע מתבצע עדכון קצר למערכת.\n\n' +
             'ההתקדמות בתהליך פרסום נעצרה זמנית.\n' +
@@ -780,7 +780,7 @@ bot.on('callback_query', async (callbackQuery) => {
     const data = callbackQuery.data;
     
     // תחזוקה גלובלית: חסימת אינטראקציות והצגת הודעה ידידותית
-    if (process.env.MAINTENANCE_MODE === 'true') {
+    if (isMaintenanceMode()) {
         try {
             await bot.answerCallbackQuery(callbackQuery.id, {
                 text: '🔧 תחזוקה קלה, נסו שוב בעוד כדקה',
