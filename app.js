@@ -394,15 +394,35 @@ bot.on('callback_query', async (callbackQuery) => {
         } else if (data.startsWith('share_own_')) {
             await userHandler.handleSharePost(callbackQuery);
         } else if (data.startsWith('edit_')) {
-            await userHandler.startEditingPost(callbackQuery);
+            // בדיקה איזה סוג של עריכה
+            if (data.startsWith('edit_title_') || 
+                data.startsWith('edit_desc_') || 
+                data.startsWith('edit_pricing_') || 
+                data.startsWith('edit_tags_') || 
+                data.startsWith('edit_links_') || 
+                data.startsWith('edit_contact_')) {
+                await userHandler.handleEditField(callbackQuery);
+            } else {
+                await userHandler.startEditingPost(callbackQuery);
+            }
+        } else if (data.startsWith('back_to_post_')) {
+            // חזרה מעריכה למודעה
+            const postId = parseInt(data.replace('back_to_post_', ''));
+            await userHandler.showUserPostsDetailed(chatId, userId);
         } else if (data.startsWith('toggle_')) {
             await userHandler.togglePostStatus(callbackQuery);
         } else if (data.startsWith('delete_')) {
             await userHandler.confirmDeletePost(callbackQuery);
         } else if (data.startsWith('confirm_delete_')) {
             await userHandler.executeDeletePost(callbackQuery);
+        } else if (data.startsWith('cancel_delete_')) {
+            // ביטול מחיקה - חזרה למודעות שלי
+            await userHandler.showUserPostsDetailed(chatId, userId);
+            await bot.answerCallbackQuery(callbackQuery.id, 'המחיקה בוטלה');
         } else if (data.startsWith('stats_')) {
             await userHandler.showPostStats(callbackQuery);
+        } else if (data === 'back_to_my_posts') {
+            await userHandler.showUserPostsDetailed(chatId, userId);
         } else if (data === 'back_to_main') {
             await bot.editMessageText('🎯 חזרתם לתפריט הראשי', {
                 chat_id: chatId,

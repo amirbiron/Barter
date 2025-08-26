@@ -107,10 +107,35 @@ class UserHandler {
     async handleEditField(callbackQuery) {
         const chatId = callbackQuery.message.chat.id;
         const userId = callbackQuery.from.id;
-        const [action, field, postId] = callbackQuery.data.split('_');
+        const data = callbackQuery.data;
+        
+        // Parse field and postId from callback data like "edit_title_123" or "edit_desc_123"
+        let field, postId;
+        if (data.startsWith('edit_title_')) {
+            field = 'title';
+            postId = parseInt(data.replace('edit_title_', ''));
+        } else if (data.startsWith('edit_desc_')) {
+            field = 'desc';
+            postId = parseInt(data.replace('edit_desc_', ''));
+        } else if (data.startsWith('edit_pricing_')) {
+            field = 'pricing';
+            postId = parseInt(data.replace('edit_pricing_', ''));
+        } else if (data.startsWith('edit_tags_')) {
+            field = 'tags';
+            postId = parseInt(data.replace('edit_tags_', ''));
+        } else if (data.startsWith('edit_links_')) {
+            field = 'links';
+            postId = parseInt(data.replace('edit_links_', ''));
+        } else if (data.startsWith('edit_contact_')) {
+            field = 'contact';
+            postId = parseInt(data.replace('edit_contact_', ''));
+        } else {
+            await this.bot.answerCallbackQuery(callbackQuery.id, 'שדה עריכה לא מוכר');
+            return;
+        }
 
         try {
-            const post = await db.getPost(parseInt(postId));
+            const post = await db.getPost(postId);
             
             if (!post || post.user_id !== userId) {
                 await this.bot.answerCallbackQuery(callbackQuery.id, 'אין הרשאה');
@@ -121,7 +146,7 @@ class UserHandler {
             const sessionId = `${userId}_${postId}_${field}`;
             this.editingSessions.set(sessionId, {
                 userId,
-                postId: parseInt(postId),
+                postId,
                 field,
                 originalPost: post,
                 messageId: callbackQuery.message.message_id,
@@ -352,19 +377,38 @@ class UserHandler {
     // 🗑️ מחיקת מודעות
     async confirmDeletePost(callbackQuery) {
         const chatId = callbackQuery.message.chat.id;
+        const userId = callbackQuery.from.id;
         const postId = parseInt(callbackQuery.data.split('_')[1]);
 
-        const e = this.emojis;
-        const confirmMessage = `${e ? '⚠️' : ''} *אישור מחיקה*\n\nהאם אתם בטוחים שברצונכם למחוק את המודעה?\n\n${e ? '🔥' : '•'} הפעולה בלתי הפיכה!\n${e ? '📊' : '•'} כל הנתונים והסטטיסטיקות יאבדו.`;
+        try {
+            // קבלת פרטי המודעה לאישור
+            const post = await db.getPost(postId);
+            
+            if (!post || post.user_id !== userId) {
+                await this.bot.answerCallbackQuery(callbackQuery.id, 'אין הרשאה למחוק מודעה זו');
+                return;
+            }
 
-        await this.bot.editMessageText(confirmMessage, {
-            chat_id: chatId,
-            message_id: callbackQuery.message.message_id,
-            parse_mode: 'Markdown',
-            ...keyboards.getDeleteConfirmKeyboard(postId)
-        });
+            const e = this.emojis;
+            const confirmMessage = `${e ? '⚠️' : ''} *אישור מחיקה*\n\n` +
+                `האם אתם בטוחים שברצונכם למחוק את המודעה:\n` +
+                `*"${utils.truncateText(post.title, 50)}"*?\n\n` +
+                `${e ? '🔥' : '•'} הפעולה בלתי הפיכה!\n` +
+                `${e ? '📊' : '•'} כל הנתונים והסטטיסטיקות יאבדו.`;
 
-        await this.bot.answerCallbackQuery(callbackQuery.id);
+            await this.bot.editMessageText(confirmMessage, {
+                chat_id: chatId,
+                message_id: callbackQuery.message.message_id,
+                parse_mode: 'Markdown',
+                ...keyboards.getDeleteConfirmKeyboard(postId)
+            });
+
+            await this.bot.answerCallbackQuery(callbackQuery.id, 'נדרש אישור למחיקה');
+            
+        } catch (error) {
+            utils.logError(error, 'confirmDeletePost');
+            await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
+        }
     }
 
     async executeDeletePost(callbackQuery) {
