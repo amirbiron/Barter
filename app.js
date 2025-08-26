@@ -493,3 +493,28 @@ console.log(`🗃️ מיקום DB: ${config.database.path}`);
 if (config.bot.debugMode) {
     console.log('📊 מידע מערכת:', JSON.stringify(utils.getSystemInfo(), null, 2));
 }
+
+// הוספת שרת HTTP פשוט כדי שהדיפלוי יזהה פורט פתוח
+const http = require('http');
+const PORT = process.env.PORT || 3000;
+
+const server = http.createServer((req, res) => {
+    // Health check endpoint
+    if (req.url === '/health' || req.url === '/') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            status: 'ok',
+            service: 'telegram-barter-bot',
+            timestamp: new Date().toISOString(),
+            uptime: process.uptime()
+        }));
+    } else {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found');
+    }
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🌐 שרת HTTP מאזין על פורט ${PORT}`);
+    console.log(`✅ Health check זמין ב: http://localhost:${PORT}/health`);
+});
