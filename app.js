@@ -432,9 +432,23 @@ bot.on('callback_query', async (callbackQuery) => {
             const post = await db.getPost(postId);
             
             if (post) {
+                // זיהוי סוג פרטי הקשר והוספת הוראות מתאימות
+                let instructions = '';
+                const contact = post.contact_info;
+                
+                if (contact.includes('@') && contact.includes('.')) {
+                    instructions = '📧 *אימייל:* לחצו על הטקסט למטה כדי להעתיק';
+                } else if (contact.includes('+') || /\d{3}-?\d{3}-?\d{4}/.test(contact)) {
+                    instructions = '📱 *טלפון:* לחצו על הטקסט למטה כדי להעתיק';
+                } else if (contact.includes('t.me/') || contact.startsWith('@')) {
+                    instructions = '💬 *טלגרם:* לחצו על הטקסט למטה כדי להעתיק';
+                } else {
+                    instructions = '📋 *פרטי קשר:* לחצו על הטקסט למטה כדי להעתיק';
+                }
+                
                 // שליחת הודעה עם פרטי הקשר שאפשר להעתיק
                 await bot.sendMessage(chatId, 
-                    `📋 *פרטי קשר להעתקה:*\n\n\`${post.contact_info}\`\n\n_לחצו על הטקסט למעלה כדי להעתיק_`,
+                    `${instructions}\n\n\`${contact}\`\n\n_טיפ: אפשר גם ללחוץ לחיצה ארוכה על הטקסט ולבחור "העתק"_`,
                     { parse_mode: 'Markdown' }
                 );
                 await bot.answerCallbackQuery(callbackQuery.id, 'פרטי הקשר נשלחו בהודעה נפרדת');
