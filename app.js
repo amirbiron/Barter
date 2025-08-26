@@ -467,13 +467,13 @@ bot.on('callback_query', async (callbackQuery) => {
                 const contact = post.contact_info;
                 
                 if (contact.includes('@') && contact.includes('.')) {
-                    instructions = '📧 *אימייל:* לחצו על הטקסט למטה כדי להעתיק';
+                    instructions = '📧 *אימייל:* לחצו על הפרטים למטה - לחיצה קצרה - כדי להעתיק';
                 } else if (contact.includes('+') || /\d{3}-?\d{3}-?\d{4}/.test(contact)) {
                     instructions = '📱 *טלפון:* לחצו על הפרטים למטה - לחיצה קצרה - כדי להעתיק';
                 } else if (contact.includes('t.me/') || contact.startsWith('@')) {
-                    instructions = '💬 *טלגרם:* לחצו על הטקסט למטה כדי להעתיק';
+                    instructions = '💬 *טלגרם:* לחצו על הפרטים למטה - לחיצה קצרה - כדי להעתיק';
                 } else {
-                    instructions = '📋 *פרטי קשר:* לחצו על הטקסט למטה כדי להעתיק';
+                    instructions = '📋 *פרטי קשר:* לחצו על הפרטים למטה - לחיצה קצרה - כדי להעתיק';
                 }
                 
                 // שליחת הודעה עם פרטי הקשר שאפשר להעתיק
