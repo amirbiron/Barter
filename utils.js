@@ -464,4 +464,61 @@ class Utils {
     logAction(userId, action, details = {}) {
         if (config.bot.debugMode) {
             const timestamp = new Date().toISOString();
-            console.log(`
+            console.log(`[${timestamp}] 👤 User ${userId} -> ${action}`, details);
+        }
+    }
+
+    logError(error, context = '') {
+        const timestamp = new Date().toISOString();
+        console.error(`[${timestamp}] ❌ Error${context ? ' in ' + context : ''}:`, error);
+        
+        if (config.bot.debugMode && error.stack) {
+            console.error('Stack trace:', error.stack);
+        }
+    }
+
+    // 📝 תיעוד ובדיקות
+    validateEnvironment() {
+        const issues = [];
+        
+        if (!config.bot.token) {
+            issues.push('BOT_TOKEN חסר');
+        }
+        
+        try {
+            const fs = require('fs');
+            const dbPath = config.database.path;
+            const dir = require('path').dirname(dbPath);
+            
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+        } catch (error) {
+            issues.push('בעיה בגישה לתיקיית בסיס הנתונים');
+        }
+        
+        return {
+            isValid: issues.length === 0,
+            issues
+        };
+    }
+
+    getSystemInfo() {
+        return {
+            nodeVersion: process.version,
+            platform: process.platform,
+            uptime: process.uptime(),
+            memory: process.memoryUsage(),
+            config: {
+                dbPath: config.database.path,
+                debugMode: config.bot.debugMode,
+                maxPosts: config.content.maxPostsPerUser
+            }
+        };
+    }
+}
+
+// יצירת instance יחיד
+const utils = new Utils();
+
+module.exports = utils;
