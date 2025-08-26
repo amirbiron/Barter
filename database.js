@@ -362,7 +362,7 @@ class Database {
                 SELECT p.*, u.username, u.first_name
                 FROM posts p
                 JOIN users u ON p.user_id = u.user_id
-                WHERE p.id = ? AND p.is_active = 1
+                WHERE p.id = ?
             `;
             this.db.get(sql, [postId], (err, row) => {
                 if (err) reject(err);
