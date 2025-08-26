@@ -1501,7 +1501,7 @@ async function checkAndSendAlerts(postId, postTitle, postDescription, postUserId
                             inline_keyboard: [
                                 [
                                     { text: '👁️ צפה במודעה', callback_data: `view_post_${postId}_from_alert` },
-                                    { text: '⭐ שמור', callback_data: `save_${postId}` }
+                                    { text: '⭐ שמור', callback_data: `save_${postId}_from_alert` }
                                 ]
                             ]
                         }
