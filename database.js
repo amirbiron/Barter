@@ -3,76 +3,45 @@ const path = require('path');
 const fs = require('fs');
 
 // נתיב לבסיס הנתונים - בדיקה אם רצים על Render עם דיסק קבוע
-// ב-Render, הדיסק הקבוע בדרך כלל ממופה ל-/opt/render/project/data או /var/data
 const getDatabasePath = () => {
-    // רשימת נתיבים אפשריים לדיסק קבוע ב-Render
-    const possiblePaths = [
-        process.env.PERSISTENT_DISK_PATH, // משתנה סביבה מ-Render
-        process.env.PERSISTENT_STORAGE_DIR, // משתנה סביבה אחר
-        '/opt/render/project/data',  // נתיב נפוץ ב-Render
-        '/var/data',                  // נתיב אפשרי אחר
-    ].filter(Boolean);
-
-    // בדיקה איזה נתיב קיים וניתן לכתיבה
-    for (const dirPath of possiblePaths) {
+    // אם יש משתנה סביבה מפורש, השתמש בו
+    if (process.env.DATABASE_PATH) {
+        console.log(`📁 משתמש בנתיב מוגדר: ${process.env.DATABASE_PATH}`);
+        return process.env.DATABASE_PATH;
+    }
+    
+    // אם אנחנו ב-Render
+    if (process.env.RENDER) {
+        // נסה את Mount Path של הדיסק המתמיד
+        const mountPath = process.env.PERSISTENT_DISK_PATH || '/opt/render/project/data';
+        
         try {
-            // יצירת התיקייה אם לא קיימת
-            if (!fs.existsSync(dirPath)) {
-                try {
-                    fs.mkdirSync(dirPath, { recursive: true });
-                    console.log(`📁 נוצרה תיקייה: ${dirPath}`);
-                } catch (mkdirErr) {
-                    console.log(`⚠️ לא ניתן ליצור תיקייה: ${dirPath}`);
-                    continue;
-                }
+            // בדוק אם התיקייה קיימת
+            if (fs.existsSync(mountPath)) {
+                const dbPath = path.join(mountPath, 'barter_bot.db');
+                console.log(`📁 Render: משתמש בדיסק מתמיד: ${dbPath}`);
+                return dbPath;
             }
-            
-            // בדיקה אם יש הרשאות כתיבה
-            fs.accessSync(dirPath, fs.constants.W_OK);
-            console.log(`📁 משתמש בדיסק קבוע: ${dirPath}`);
-            
-            const dbPath = path.join(dirPath, 'barter_bot.db');
-            
-            // בדיקה אם הקובץ קיים ויש הרשאות כתיבה
-            if (fs.existsSync(dbPath)) {
-                try {
-                    fs.accessSync(dbPath, fs.constants.W_OK);
-                    console.log(`✅ קובץ מסד נתונים קיים עם הרשאות כתיבה`);
-                } catch (fileErr) {
-                    console.error(`❌ אין הרשאות כתיבה לקובץ: ${dbPath}`);
-                    // ננסה לשנות הרשאות
-                    try {
-                        fs.chmodSync(dbPath, 0o666);
-                        console.log(`✅ הרשאות הקובץ עודכנו`);
-                    } catch (chmodErr) {
-                        console.error(`❌ לא ניתן לשנות הרשאות: ${chmodErr.message}`);
-                    }
-                }
+        } catch (err) {
+            console.log(`⚠️ לא ניתן לגשת לדיסק מתמיד: ${err.message}`);
+        }
+        
+        // אם אין דיסק מתמיד, השתמש בתיקיית src
+        const srcPath = path.join('/opt/render/project/src', 'data');
+        try {
+            if (!fs.existsSync(srcPath)) {
+                fs.mkdirSync(srcPath, { recursive: true });
             }
-            
+            const dbPath = path.join(srcPath, 'barter_bot.db');
+            console.log(`📁 Render: משתמש בתיקיית src: ${dbPath}`);
             return dbPath;
         } catch (err) {
-            console.log(`⚠️ אין גישה ל-${dirPath}: ${err.message}`);
-            // המשך לנתיב הבא
+            console.log(`⚠️ לא ניתן ליצור תיקייה ב-src: ${err.message}`);
         }
     }
-
-    // אם אנחנו ב-Render אבל אין דיסק קבוע, השתמש ב-/tmp (זמני)
-    if (process.env.RENDER) {
-        console.log('⚠️ אזהרה: משתמש בתיקיית /tmp - הנתונים יימחקו בכל deploy!');
-        const tmpPath = '/tmp/barter_bot_data';
-        try {
-            if (!fs.existsSync(tmpPath)) {
-                fs.mkdirSync(tmpPath, { recursive: true });
-            }
-            return path.join(tmpPath, 'barter_bot.db');
-        } catch (err) {
-            console.error('❌ לא ניתן ליצור תיקייה ב-/tmp:', err.message);
-        }
-    }
-
-    // אם אין דיסק קבוע, השתמש בתיקייה מקומית (לפיתוח)
-    console.log('⚠️ לא נמצא דיסק קבוע, משתמש בתיקייה מקומית');
+    
+    // ברירת מחדל - תיקייה מקומית
+    console.log('📁 משתמש בתיקייה מקומית');
     return path.join(__dirname, 'barter_bot.db');
 };
 
