@@ -7,7 +7,9 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "init-db": "node database.js",
-    "smoke": "node scripts/smoke.js"
+    "smoke": "node scripts/smoke.js",
+    "lint": "eslint . --ext .js",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "dotenv": "^16.4.5",
@@ -15,7 +17,10 @@
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
-    "nodemon": "^3.1.4"
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.2",
+    "nodemon": "^3.1.4",
+    "prettier": "^3.6.2"
   },
   "engines": {
     "node": ">=18.0.0"
