@@ -19,6 +19,14 @@ const bot = new TelegramBot(config.bot.token, {
 
 console.log('🤖 הבוט מתחיל...');
 console.log('📌 גרסה: fix-all-issues-v3 - Fixed back button, persistent disk path, and deprecated callbacks');
+ 
+// חלון תחזוקת אתחול אוטומטי (ללא צורך במשתנה סביבה)
+const STARTUP_MAINTENANCE_WINDOW_MS = 60000; // 60 שניות
+
+function isMaintenanceMode() {
+    // תחזוקה ידנית דרך משתנה סביבה או חלון אתחול קצר אחרי ריסטארט
+    return process.env.MAINTENANCE_MODE === 'true' || (process.uptime() * 1000 < STARTUP_MAINTENANCE_WINDOW_MS);
+}
 
 // הצג את הגדרות הסביבה החשובות
 if (process.env.RENDER) {
