@@ -18,7 +18,7 @@ const bot = new TelegramBot(config.bot.token, {
 });
 
 console.log('🤖 הבוט מתחיל...');
-console.log('📌 גרסה: fix-db-path-v2 - Use /tmp if persistent disk is readonly');
+console.log('📌 גרסה: fix-all-issues-v3 - Fixed back button, persistent disk path, and deprecated callbacks');
 
 // הצג את הגדרות הסביבה החשובות
 if (process.env.RENDER) {
@@ -422,18 +422,34 @@ bot.on('callback_query', async (callbackQuery) => {
                 await userHandler.startEditingPost(callbackQuery);
             }
         } else if (data.startsWith('back_to_post_')) {
-            // חזרה מפרטי קשר למודעה
+            // חזרה למודעה - בודק מאיפה באנו
             const postId = parseInt(data.replace('back_to_post_', ''));
             const post = await db.getPost(postId);
             
-            if (post && post.is_active) {
-                const postMessage = formatPostMessage(post);
-                await bot.editMessageText(postMessage, {
-                    chat_id: chatId,
-                    message_id: msg.message_id,
-                    parse_mode: 'Markdown',
-                    ...getPostActionsKeyboard(postId)
-                });
+            if (post) {
+                // אם זו המודעה של המשתמש, הצג עם כפתורי ניהול
+                if (post.user_id === userId) {
+                    const message = utils.formatPostPreview(post);
+                    const keyboard = keyboards.getUserPostActionsKeyboard(post.id, post.is_active);
+                    
+                    await bot.editMessageText(message, {
+                        chat_id: chatId,
+                        message_id: msg.message_id,
+                        parse_mode: 'Markdown',
+                        ...keyboard
+                    });
+                } else {
+                    // אם זו מודעה של מישהו אחר, הצג עם כפתורי צפייה
+                    const postMessage = formatPostMessage(post);
+                    await bot.editMessageText(postMessage, {
+                        chat_id: chatId,
+                        message_id: msg.message_id,
+                        parse_mode: 'Markdown',
+                        ...getPostActionsKeyboard(postId)
+                    });
+                }
+                
+                await bot.answerCallbackQuery(callbackQuery.id);
             } else {
                 await bot.answerCallbackQuery(callbackQuery.id, {
                 text: 'המודעה לא נמצאה',
@@ -499,14 +515,20 @@ bot.on('callback_query', async (callbackQuery) => {
             });
             clearUserState(userId);
         } else {
-            await bot.answerCallbackQuery(callbackQuery.id, config.messages.featureInDevelopment);
+            await bot.answerCallbackQuery(callbackQuery.id, {
+                text: config.messages.featureInDevelopment,
+                show_alert: false
+            });
         }
         
         utils.logAction(userId, 'callback_query', { action: data });
         
     } catch (error) {
         utils.logError(error, 'callback_query_handler');
-        await bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
+        await bot.answerCallbackQuery(callbackQuery.id, {
+            text: config.messages.error,
+            show_alert: true
+        });
     }
 });
 

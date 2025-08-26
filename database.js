@@ -12,26 +12,30 @@ const getDatabasePath = () => {
     
     // אם אנחנו ב-Render
     if (process.env.RENDER) {
-        // נסה קודם את הדיסק המתמיד אם הוא קיים ויש הרשאות
+        // נסה קודם את הדיסק המתמיד
         const persistentPath = '/opt/render/project/data';
         try {
-            if (fs.existsSync(persistentPath)) {
-                // בדוק אם יש הרשאות כתיבה
-                fs.accessSync(persistentPath, fs.constants.W_OK);
-                console.log('📁 Render: משתמש בדיסק מתמיד');
-                return path.join(persistentPath, 'barter_bot.db');
+            // יצור את התיקייה אם לא קיימת
+            if (!fs.existsSync(persistentPath)) {
+                fs.mkdirSync(persistentPath, { recursive: true });
+                console.log('📁 נוצרה תיקיית דיסק מתמיד');
             }
+            
+            // בדוק הרשאות כתיבה
+            fs.accessSync(persistentPath, fs.constants.W_OK);
+            console.log('📁 Render: משתמש בדיסק מתמיד');
+            return path.join(persistentPath, 'barter_bot.db');
         } catch (err) {
-            console.log('⚠️ אין הרשאות כתיבה לדיסק המתמיד');
+            console.log('⚠️ אין הרשאות כתיבה לדיסק המתמיד:', err.message);
+            
+            // אם אין הרשאות, השתמש ב-/tmp
+            console.log('📁 Render: משתמש בתיקיית /tmp (זמני - יימחק בכל deploy!)');
+            const tmpDir = '/tmp/barter_bot_data';
+            if (!fs.existsSync(tmpDir)) {
+                fs.mkdirSync(tmpDir, { recursive: true });
+            }
+            return path.join(tmpDir, 'barter_bot.db');
         }
-        
-        // אם אין דיסק מתמיד או אין הרשאות, השתמש ב-/tmp
-        console.log('📁 Render: משתמש בתיקיית /tmp (זמני - יימחק בכל deploy!)');
-        const tmpDir = '/tmp/barter_bot_data';
-        if (!fs.existsSync(tmpDir)) {
-            fs.mkdirSync(tmpDir, { recursive: true });
-        }
-        return path.join(tmpDir, 'barter_bot.db');
     }
     
     // ברירת מחדל - תיקייה מקומית
