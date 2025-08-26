@@ -840,25 +840,37 @@ bot.on('callback_query', async (callbackQuery) => {
                     });
                 }
             } else if (isFrom && origin === 'alert') {
-                // View post from an alert - use back-to-alerts keyboard and save carries alert context
+                // View post from an alert - include admin delete button if applicable
                 const post = await db.getPost(postId);
                 
                 if (post && post.is_active) {
                     const postMessage = formatPostMessage(post);
                     const e = config.bot.useEmojis;
+                    const isAdmin = config.isAdmin(userId);
+                    
+                    const inline = [
+                        [
+                            { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
+                            { text: `${e ? '⭐ ' : ''}שמור`, callback_data: `save_${postId}_from_alert` }
+                        ],
+                        [
+                            { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
+                            { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
+                        ]
+                    ];
+                    
+                    if (isAdmin) {
+                        inline.push([
+                            { text: `${e ? '🗑️ ' : ''}מחק מודעה`, callback_data: `admin_delete_${postId}` },
+                            { text: `${e ? '🔙 ' : ''}חזרה להתראות`, callback_data: 'alert_menu' }
+                        ]);
+                    } else {
+                        inline.push([{ text: `${e ? '🔙 ' : ''}חזרה להתראות`, callback_data: 'alert_menu' }]);
+                    }
+                    
                     const keyboard = {
                         reply_markup: {
-                            inline_keyboard: [
-                                [
-                                    { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
-                                    { text: `${e ? '⭐ ' : ''}שמור`, callback_data: `save_${postId}_from_alert` }
-                                ],
-                                [
-                                    { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
-                                    { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
-                                ],
-                                [{ text: `${e ? '🔙 ' : ''}חזרה להתראות`, callback_data: 'alert_menu' }]
-                            ]
+                            inline_keyboard: inline
                         }
                     };
                     
