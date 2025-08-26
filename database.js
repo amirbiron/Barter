@@ -2,7 +2,7 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 
-// נתיב לבסיס הנתונים - בדיקה אם רצים על Render עם דיסק קבוע
+// נתיב לבסיס הנתונים
 const getDatabasePath = () => {
     // אם יש משתנה סביבה מפורש, השתמש בו
     if (process.env.DATABASE_PATH) {
@@ -10,34 +10,10 @@ const getDatabasePath = () => {
         return process.env.DATABASE_PATH;
     }
     
-    // אם אנחנו ב-Render
-    if (process.env.RENDER) {
-        // נסה את Mount Path של הדיסק המתמיד
-        const mountPath = process.env.PERSISTENT_DISK_PATH || '/opt/render/project/data';
-        
-        try {
-            // בדוק אם התיקייה קיימת
-            if (fs.existsSync(mountPath)) {
-                const dbPath = path.join(mountPath, 'barter_bot.db');
-                console.log(`📁 Render: משתמש בדיסק מתמיד: ${dbPath}`);
-                return dbPath;
-            }
-        } catch (err) {
-            console.log(`⚠️ לא ניתן לגשת לדיסק מתמיד: ${err.message}`);
-        }
-        
-        // אם אין דיסק מתמיד, השתמש בתיקיית src
-        const srcPath = path.join('/opt/render/project/src', 'data');
-        try {
-            if (!fs.existsSync(srcPath)) {
-                fs.mkdirSync(srcPath, { recursive: true });
-            }
-            const dbPath = path.join(srcPath, 'barter_bot.db');
-            console.log(`📁 Render: משתמש בתיקיית src: ${dbPath}`);
-            return dbPath;
-        } catch (err) {
-            console.log(`⚠️ לא ניתן ליצור תיקייה ב-src: ${err.message}`);
-        }
+    // אם אנחנו ב-Render עם דיסק מתמיד
+    if (process.env.RENDER && fs.existsSync('/opt/render/project/data')) {
+        console.log('📁 Render: משתמש בדיסק מתמיד');
+        return path.join('/opt/render/project/data', 'barter_bot.db');
     }
     
     // ברירת מחדל - תיקייה מקומית
@@ -50,21 +26,28 @@ console.log(`💾 נתיב מסד הנתונים: ${DB_PATH}`);
 
 class Database {
     constructor() {
-        // פתיחת מסד הנתונים עם טיפול משופר בשגיאות
-        this.db = new sqlite3.Database(DB_PATH, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
+        // פתיחת מסד הנתונים
+        this.db = new sqlite3.Database(DB_PATH, (err) => {
             if (err) {
                 console.error('❌ שגיאה בפתיחת בסיס הנתונים:', err.message);
+                console.error('נתיב:', DB_PATH);
                 
-                // ניסיון נוסף עם נתיב חלופי
-                if (err.code === 'SQLITE_READONLY') {
-                    console.log('🔄 מנסה נתיב חלופי...');
-                    const altPath = path.join('/tmp', 'barter_bot.db');
-                    this.db = new sqlite3.Database(altPath, (err2) => {
+                // אם הבעיה היא הרשאות, נסה ליצור קובץ חדש
+                if (err.code === 'SQLITE_READONLY' || err.code === 'SQLITE_CANTOPEN') {
+                    console.log('🔄 מנסה ליצור מסד נתונים חדש...');
+                    // וודא שהתיקייה קיימת
+                    const dir = path.dirname(DB_PATH);
+                    if (!fs.existsSync(dir)) {
+                        fs.mkdirSync(dir, { recursive: true });
+                    }
+                    
+                    // נסה שוב
+                    this.db = new sqlite3.Database(DB_PATH, (err2) => {
                         if (err2) {
-                            console.error('❌ גם הנתיב החלופי נכשל:', err2.message);
+                            console.error('❌ נכשל גם בניסיון השני:', err2.message);
                             process.exit(1);
                         } else {
-                            console.log(`✅ התחברות מוצלחת לבסיס הנתונים (נתיב חלופי: ${altPath})`);
+                            console.log('✅ מסד נתונים חדש נוצר בהצלחה');
                             this.init();
                         }
                     });
