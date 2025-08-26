@@ -2,32 +2,44 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 
-// נתיב לבסיס הנתונים - בדיקה אם רצים על Render עם דיסק קבוע
-// ב-Render, הדיסק הקבוע בדרך כלל ממופה ל-/opt/render/project/data או /var/data
+// נתיב לבסיס הנתונים
 const getDatabasePath = () => {
-    // רשימת נתיבים אפשריים לדיסק קבוע ב-Render
-    const possiblePaths = [
-        '/opt/render/project/data',  // נתיב נפוץ ב-Render
-        '/var/data',                  // נתיב אפשרי אחר
-        process.env.PERSISTENT_STORAGE_DIR, // אם הגדרת משתנה סביבה
-    ].filter(Boolean);
-
-    // בדיקה איזה נתיב קיים וניתן לכתיבה
-    for (const dirPath of possiblePaths) {
+    // אם יש משתנה סביבה מפורש, השתמש בו
+    if (process.env.DATABASE_PATH) {
+        console.log(`📁 משתמש בנתיב מוגדר: ${process.env.DATABASE_PATH}`);
+        return process.env.DATABASE_PATH;
+    }
+    
+    // אם אנחנו ב-Render
+    if (process.env.RENDER) {
+        // נסה קודם את הדיסק המתמיד
+        const persistentPath = '/opt/render/project/data';
         try {
-            if (fs.existsSync(dirPath)) {
-                // בדיקה אם יש הרשאות כתיבה
-                fs.accessSync(dirPath, fs.constants.W_OK);
-                console.log(`📁 משתמש בדיסק קבוע: ${dirPath}`);
-                return path.join(dirPath, 'barter_bot.db');
+            // יצור את התיקייה אם לא קיימת
+            if (!fs.existsSync(persistentPath)) {
+                fs.mkdirSync(persistentPath, { recursive: true });
+                console.log('📁 נוצרה תיקיית דיסק מתמיד');
             }
+            
+            // בדוק הרשאות כתיבה
+            fs.accessSync(persistentPath, fs.constants.W_OK);
+            console.log('📁 Render: משתמש בדיסק מתמיד');
+            return path.join(persistentPath, 'barter_bot.db');
         } catch (err) {
-            // המשך לנתיב הבא
+            console.log('⚠️ אין הרשאות כתיבה לדיסק המתמיד:', err.message);
+            
+            // אם אין הרשאות, השתמש ב-/tmp
+            console.log('📁 Render: משתמש בתיקיית /tmp (זמני - יימחק בכל deploy!)');
+            const tmpDir = '/tmp/barter_bot_data';
+            if (!fs.existsSync(tmpDir)) {
+                fs.mkdirSync(tmpDir, { recursive: true });
+            }
+            return path.join(tmpDir, 'barter_bot.db');
         }
     }
-
-    // אם אין דיסק קבוע, השתמש בתיקייה מקומית (לפיתוח)
-    console.log('⚠️ לא נמצא דיסק קבוע, משתמש בתיקייה מקומית');
+    
+    // ברירת מחדל - תיקייה מקומית
+    console.log('📁 משתמש בתיקייה מקומית');
     return path.join(__dirname, 'barter_bot.db');
 };
 
@@ -36,9 +48,34 @@ console.log(`💾 נתיב מסד הנתונים: ${DB_PATH}`);
 
 class Database {
     constructor() {
+        // פתיחת מסד הנתונים
         this.db = new sqlite3.Database(DB_PATH, (err) => {
             if (err) {
                 console.error('❌ שגיאה בפתיחת בסיס הנתונים:', err.message);
+                console.error('נתיב:', DB_PATH);
+                
+                // אם הבעיה היא הרשאות, נסה ליצור קובץ חדש
+                if (err.code === 'SQLITE_READONLY' || err.code === 'SQLITE_CANTOPEN') {
+                    console.log('🔄 מנסה ליצור מסד נתונים חדש...');
+                    // וודא שהתיקייה קיימת
+                    const dir = path.dirname(DB_PATH);
+                    if (!fs.existsSync(dir)) {
+                        fs.mkdirSync(dir, { recursive: true });
+                    }
+                    
+                    // נסה שוב
+                    this.db = new sqlite3.Database(DB_PATH, (err2) => {
+                        if (err2) {
+                            console.error('❌ נכשל גם בניסיון השני:', err2.message);
+                            process.exit(1);
+                        } else {
+                            console.log('✅ מסד נתונים חדש נוצר בהצלחה');
+                            this.init();
+                        }
+                    });
+                } else {
+                    process.exit(1);
+                }
             } else {
                 console.log('✅ התחברות מוצלחת לבסיס הנתונים');
                 this.init();
@@ -68,7 +105,7 @@ class Database {
                         user_id INTEGER NOT NULL,
                         title TEXT NOT NULL,
                         description TEXT NOT NULL,
-                        pricing_mode TEXT CHECK(pricing_mode IN ('barter', 'payment', 'both')) NOT NULL,
+                        pricing_mode TEXT CHECK(pricing_mode IN ('barter', 'payment', 'both', 'free')) NOT NULL,
                         price_range TEXT,
                         portfolio_links TEXT,
                         contact_info TEXT NOT NULL,
@@ -114,6 +151,32 @@ class Database {
                         VALUES (NEW.id, NEW.title, NEW.description, NEW.tags);
                     END
                 `);
+
+                // טבלת מועדפים - שמירת מודעות למשתמשים
+                this.db.run(`
+                    CREATE TABLE IF NOT EXISTS saved_posts (
+                        user_id INTEGER NOT NULL,
+                        post_id INTEGER NOT NULL,
+                        saved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (user_id, post_id),
+                        FOREIGN KEY (user_id) REFERENCES users (user_id),
+                        FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE
+                    )
+                `, (err) => {
+                    if (err && !err.message.includes('already exists')) {
+                        console.error('שגיאה ביצירת טבלת saved_posts:', err);
+                    }
+                });
+
+                // אינדקס לשיפור ביצועים
+                this.db.run(`
+                    CREATE INDEX IF NOT EXISTS idx_saved_posts_user 
+                    ON saved_posts(user_id)
+                `, (err) => {
+                    if (err && !err.message.includes('already exists')) {
+                        console.error('שגיאה ביצירת אינדקס:', err);
+                    }
+                });
 
                 console.log('✅ בסיס הנתונים הוכן בהצלחה');
                 resolve();
@@ -210,13 +273,23 @@ class Database {
         return new Promise((resolve, reject) => {
             const sql = `
                 SELECT * FROM posts 
-                WHERE user_id = ? AND is_active = 1 
+                WHERE user_id = ?
                 ORDER BY created_at DESC
             `;
+            
             this.db.all(sql, [userId], (err, rows) => {
-                if (err) reject(err);
-                else {
-                    const results = rows.map(row => ({
+                if (err) {
+                    console.error('[DEBUG] Error getting user posts:', err);
+                    reject(err);
+                } else {
+                    console.log(`[DEBUG] getUserPosts for user ${userId} - found ${rows?.length || 0} posts`);
+                    if (rows) {
+                        rows.forEach(post => {
+                            console.log(`[DEBUG] Post ${post.id}: active=${post.is_active}, title="${post.title}"`);
+                        });
+                    }
+                    
+                    const results = (rows || []).map(row => ({
                         ...row,
                         tags: JSON.parse(row.tags || '[]')
                     }));
@@ -244,14 +317,43 @@ class Database {
     // הפעלה/הקפאה של מודעה
     togglePost(postId, userId) {
         return new Promise((resolve, reject) => {
-            const sql = `
-                UPDATE posts 
-                SET is_active = 1 - is_active, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ? AND user_id = ?
-            `;
-            this.db.run(sql, [postId, userId], function(err) {
-                if (err) reject(err);
-                else resolve(this.changes > 0);
+            console.log(`[DEBUG] togglePost called - postId: ${postId}, userId: ${userId}`);
+            
+            const db = this.db; // שומר את הרפרנס
+            
+            // קודם נבדוק מה המצב הנוכחי
+            db.get('SELECT is_active FROM posts WHERE id = ? AND user_id = ?', [postId, userId], (err, row) => {
+                if (err) {
+                    console.error('[DEBUG] Error checking post status:', err);
+                    reject(err);
+                    return;
+                }
+                
+                console.log(`[DEBUG] Current post status:`, row);
+                
+                // עכשיו נעדכן
+                const sql = `
+                    UPDATE posts 
+                    SET is_active = 1 - is_active, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ? AND user_id = ?
+                `;
+                
+                db.run(sql, [postId, userId], function(err) {
+                    if (err) {
+                        console.error('[DEBUG] Error toggling post:', err);
+                        reject(err);
+                    } else {
+                        const changes = this.changes;
+                        console.log(`[DEBUG] Toggle result - changes: ${changes}`);
+                        
+                        // בדיקה אחרי העדכון
+                        db.get('SELECT id, is_active FROM posts WHERE id = ?', [postId], (err2, row2) => {
+                            console.log(`[DEBUG] Post after toggle:`, row2);
+                        });
+                        
+                        resolve(changes > 0);
+                    }
+                });
             });
         });
     }
@@ -263,7 +365,7 @@ class Database {
                 SELECT p.*, u.username, u.first_name
                 FROM posts p
                 JOIN users u ON p.user_id = u.user_id
-                WHERE p.id = ? AND p.is_active = 1
+                WHERE p.id = ?
             `;
             this.db.get(sql, [postId], (err, row) => {
                 if (err) reject(err);
@@ -304,6 +406,99 @@ class Database {
                     }));
                     resolve(results);
                 }
+            });
+        });
+    }
+
+    // פונקציות ניהול מועדפים
+    
+    // שמירת מודעה למועדפים
+    savePost(userId, postId) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                INSERT OR IGNORE INTO saved_posts (user_id, post_id)
+                VALUES (?, ?)
+            `;
+            this.db.run(sql, [userId, postId], function(err) {
+                if (err) {
+                    console.error('[DEBUG] Error saving post:', err);
+                    reject(err);
+                } else {
+                    console.log(`[DEBUG] savePost - changes: ${this.changes}`);
+                    resolve({ saved: this.changes > 0 });
+                }
+            });
+        });
+    }
+
+    // הסרת מודעה מהמועדפים
+    unsavePost(userId, postId) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                DELETE FROM saved_posts 
+                WHERE user_id = ? AND post_id = ?
+            `;
+            this.db.run(sql, [userId, postId], function(err) {
+                if (err) {
+                    console.error('[DEBUG] Error unsaving post:', err);
+                    reject(err);
+                } else {
+                    console.log(`[DEBUG] unsavePost - changes: ${this.changes}`);
+                    resolve({ removed: this.changes > 0 });
+                }
+            });
+        });
+    }
+
+    // בדיקה אם מודעה שמורה
+    isPostSaved(userId, postId) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                SELECT COUNT(*) as count 
+                FROM saved_posts 
+                WHERE user_id = ? AND post_id = ?
+            `;
+            this.db.get(sql, [userId, postId], (err, row) => {
+                if (err) {
+                    console.error('[DEBUG] Error checking if post saved:', err);
+                    reject(err);
+                } else {
+                    console.log(`[DEBUG] isPostSaved - userId: ${userId}, postId: ${postId}, count: ${row.count}`);
+                    resolve(row.count > 0);
+                }
+            });
+        });
+    }
+
+    // קבלת כל המודעות השמורות של משתמש
+    getSavedPosts(userId) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                SELECT p.*, sp.saved_at
+                FROM posts p
+                INNER JOIN saved_posts sp ON p.id = sp.post_id
+                WHERE sp.user_id = ? AND p.is_active = 1
+                ORDER BY sp.saved_at DESC
+            `;
+            this.db.all(sql, [userId], (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows);
+            });
+        });
+    }
+
+    // ספירת מודעות שמורות
+    countSavedPosts(userId) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                SELECT COUNT(*) as count 
+                FROM saved_posts sp
+                INNER JOIN posts p ON p.id = sp.post_id
+                WHERE sp.user_id = ? AND p.is_active = 1
+            `;
+            this.db.get(sql, [userId], (err, row) => {
+                if (err) reject(err);
+                else resolve(row.count);
             });
         });
     }

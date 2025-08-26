@@ -44,7 +44,27 @@ class Config {
         // 🗃️ הגדרות בסיס נתונים
         this.database = {
             name: process.env.DB_NAME || 'barter_bot.db',
-            path: require('path').join(__dirname, process.env.DB_NAME || 'barter_bot.db')
+            // משתמש באותה לוגיקה כמו database.js
+            path: (() => {
+                const path = require('path');
+                const fs = require('fs');
+                
+                // אם יש משתנה סביבה מפורש
+                if (process.env.DATABASE_PATH) {
+                    return process.env.DATABASE_PATH;
+                }
+                
+                // אם אנחנו ב-Render
+                if (process.env.RENDER) {
+                    const persistentPath = '/opt/render/project/data';
+                    if (fs.existsSync(persistentPath)) {
+                        return path.join(persistentPath, 'barter_bot.db');
+                    }
+                }
+                
+                // ברירת מחדל
+                return path.join(__dirname, 'barter_bot.db');
+            })()
         };
 
         // 📊 הגדרות תוכן

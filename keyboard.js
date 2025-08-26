@@ -11,14 +11,14 @@ class KeyboardManager {
 
     // 🏠 תפריט ראשי
     getMainKeyboard() {
-        const e = this.emojis;
+        const e = config.bot.useEmojis;
         
         return {
             reply_markup: {
                 keyboard: [
                     [`${e ? '📝 ' : ''}פרסום שירות`, `${e ? '🔍 ' : ''}חיפוש`],
                     [`${e ? '📱 ' : ''}דפדוף`, `${e ? '📋 ' : ''}המודעות שלי`],
-                    [`${e ? 'ℹ️ ' : ''}עזרה`]
+                    [`${e ? '⭐ ' : ''}מועדפים`, `${e ? 'ℹ️ ' : ''}עזרה`]
                 ],
                 resize_keyboard: true,
                 one_time_keyboard: false
@@ -81,27 +81,61 @@ class KeyboardManager {
         };
     }
 
-    // 📋 ניהול מודעות של המשתמש
-    getUserPostActionsKeyboard(postId, isActive = true) {
+    // 📄 פעולות על מודעה עם סטטוס שמירה
+    getPostActionsKeyboardWithSaveStatus(postId, isSaved = false) {
         const e = this.emojis;
+        const saveButtonText = isSaved ? 
+            `${e ? '💔 ' : ''}הסר ממועדפים` : 
+            `${e ? '⭐ ' : ''}שמור`;
         
         return {
             reply_markup: {
                 inline_keyboard: [
                     [
-                        { text: `${e ? '✏️ ' : ''}ערוך`, callback_data: `edit_${postId}` },
-                        { 
-                            text: isActive ? `${e ? '⏸️ ' : ''}הקפא` : `${e ? '▶️ ' : ''}הפעל`, 
-                            callback_data: `toggle_${postId}` 
-                        }
+                        { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
+                        { text: saveButtonText, callback_data: `save_${postId}` }
                     ],
                     [
-                        { text: `${e ? '📊 ' : ''}סטטיסטיקה`, callback_data: `stats_${postId}` },
-                        { text: `${e ? '🔗 ' : ''}שתף`, callback_data: `share_own_${postId}` }
+                        { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
+                        { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
                     ],
-                    [{ text: `${e ? '🗑️ ' : ''}מחק`, callback_data: `delete_${postId}` }],
-                    [{ text: `${e ? '🔙 ' : ''}חזרה`, callback_data: 'back_to_my_posts' }]
+                    [{ text: `${e ? '🔙 ' : ''}חזרה`, callback_data: 'back_to_browse' }]
                 ]
+            }
+        };
+    }
+
+    // 📋 ניהול מודעות של המשתמש
+    getUserPostActionsKeyboard(postId, isActive = true) {
+        const e = this.emojis;
+        
+        const buttons = [
+            [
+                { text: `${e ? '✏️ ' : ''}ערוך`, callback_data: `edit_${postId}` },
+                { 
+                    text: isActive ? `${e ? '⏸️ ' : ''}הקפא` : `${e ? '▶️ ' : ''}הפעל`, 
+                    callback_data: `toggle_${postId}` 
+                }
+            ],
+            [
+                { text: `${e ? '📊 ' : ''}סטטיסטיקה`, callback_data: `stats_${postId}` }
+            ]
+        ];
+        
+        // הוסף כפתור שתף רק למודעות פעילות
+        if (isActive) {
+            buttons[1].push({ text: `${e ? '🔗 ' : ''}שתף`, callback_data: `share_own_${postId}` });
+        }
+        
+        // הוסף כפתורי מחיקה וחזרה
+        buttons.push(
+            [{ text: `${e ? '🗑️ ' : ''}מחק`, callback_data: `delete_${postId}` }],
+            [{ text: `${e ? '🔙 ' : ''}חזרה`, callback_data: 'back_to_my_posts' }]
+        );
+        
+        return {
+            reply_markup: {
+                inline_keyboard: buttons
             }
         };
     }
@@ -174,28 +208,17 @@ class KeyboardManager {
     getContactActionsKeyboard(postId, contactInfo) {
         const e = this.emojis;
         
+        console.log(`[DEBUG] Contact info for post ${postId}: "${contactInfo}"`);
+        
         const buttons = [];
         
-        // זיהוי סוג פרטי הקשר והוספת כפתורים מתאימים
-        if (contactInfo.includes('@') && !contactInfo.includes(' ')) {
-            // נראה כמו אימייל
-            buttons.push([{ text: `${e ? '📧 ' : ''}שלח אימייל`, url: `mailto:${contactInfo}` }]);
-        }
-        
-        if (contactInfo.includes('+') || /\d{3}-?\d{3}-?\d{4}/.test(contactInfo)) {
-            // נראה כמו טלפון
-            buttons.push([{ text: `${e ? '📱 ' : ''}התקשר`, url: `tel:${contactInfo.replace(/\D/g, '')}` }]);
-        }
-        
-        if (contactInfo.includes('t.me/') || contactInfo.includes('@')) {
-            // נראה כמו טלגרם
-            const username = contactInfo.replace('t.me/', '').replace('@', '');
-            buttons.push([{ text: `${e ? '💬 ' : ''}פנה בטלגרם`, url: `https://t.me/${username}` }]);
-        }
-        
-        // כפתור העתקה של פרטי הקשר
+        // תמיד מוסיפים כפתור העתקה - זה הכי אוניברסלי
         buttons.push([{ text: `${e ? '📋 ' : ''}העתק פרטי קשר`, callback_data: `copy_contact_${postId}` }]);
+        
+        // כפתור חזרה
         buttons.push([{ text: `${e ? '🔙 ' : ''}חזרה`, callback_data: `back_to_post_${postId}` }]);
+        
+        console.log(`[DEBUG] Final buttons structure:`, JSON.stringify(buttons, null, 2));
         
         return {
             reply_markup: {

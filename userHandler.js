@@ -68,19 +68,22 @@ class UserHandler {
         }
     }
 
-    // ✏️ עריכת מודעות
+    // ✏️ עריכה של מודעות
     async startEditingPost(callbackQuery) {
+        console.log('[DEBUG] startEditingPost called');
         const chatId = callbackQuery.message.chat.id;
         const userId = callbackQuery.from.id;
         const postId = parseInt(callbackQuery.data.split('_')[1]);
 
         try {
             const post = await db.getPost(postId);
+            console.log('[DEBUG] Post found:', !!post, 'User match:', post?.user_id === userId);
             
             if (!post || post.user_id !== userId) {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 
-                    `${this.emojis ? '❌' : ''} המודעה לא נמצאה או שאין לכם הרשאה לערוך אותה`
-                );
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: `${this.emojis ? '❌' : ''} המודעה לא קיימת במערכת. ייתכן שנמחקה.`,
+                show_alert: true
+            });
                 return;
             }
 
@@ -130,7 +133,10 @@ class UserHandler {
             field = 'contact';
             postId = parseInt(data.replace('edit_contact_', ''));
         } else {
-            await this.bot.answerCallbackQuery(callbackQuery.id, 'שדה עריכה לא מוכר');
+            await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'שדה עריכה לא מוכר',
+                show_alert: false
+            });
             return;
         }
 
@@ -138,7 +144,10 @@ class UserHandler {
             const post = await db.getPost(postId);
             
             if (!post || post.user_id !== userId) {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'אין הרשאה');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'אין הרשאה',
+                show_alert: false
+            });
                 return;
             }
 
@@ -273,6 +282,34 @@ class UserHandler {
                 }
                 return { isValid: true, value: utils.sanitizeText(input) };
 
+            case 'pricing':
+                // טיפול במצב תמחור
+                const lowerInput = input.trim().toLowerCase();
+                let pricingMode = null;
+                
+                // בדיקה של האפשרויות השונות
+                if (lowerInput === 'בארטר' || lowerInput === 'החלפה' || lowerInput === 'barter') {
+                    pricingMode = 'barter';
+                } else if (lowerInput === 'תשלום' || lowerInput === 'כסף' || lowerInput === 'payment') {
+                    pricingMode = 'payment';
+                } else if (lowerInput === 'בארטר או תשלום' || lowerInput === 'שניהם' || lowerInput === 'both') {
+                    pricingMode = 'both';
+                } else if (lowerInput === 'חינם' || lowerInput === 'free') {
+                    pricingMode = 'free';
+                } else {
+                    return { 
+                        isValid: false, 
+                        error: 'מצב תמחור לא תקין. האפשרויות הן: בארטר, תשלום, בארטר או תשלום, חינם' 
+                    };
+                }
+                
+                const pricingStyle = config.getPricingStyle(pricingMode);
+                return { 
+                    isValid: true, 
+                    value: pricingMode,
+                    formatted: pricingStyle.name
+                };
+
             case 'tags':
                 const tags = utils.validateTags(input);
                 return { 
@@ -306,6 +343,7 @@ class UserHandler {
             const fieldMap = {
                 title: 'title',
                 desc: 'description',
+                pricing: 'pricing_mode',
                 tags: 'tags',
                 links: 'portfolio_links',
                 contact: 'contact_info'
@@ -334,38 +372,49 @@ class UserHandler {
 
     // 🔄 הפעלה/הקפאת מודעות
     async togglePostStatus(callbackQuery) {
+        console.log('[DEBUG] togglePostStatus called');
         const chatId = callbackQuery.message.chat.id;
         const userId = callbackQuery.from.id;
         const postId = parseInt(callbackQuery.data.split('_')[1]);
 
         try {
             const post = await db.getPost(postId);
+            console.log('[DEBUG] Toggle - Post found:', !!post, 'User match:', post?.user_id === userId);
             
             if (!post || post.user_id !== userId) {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'אין הרשאה');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'אין הרשאה',
+                show_alert: false
+            });
                 return;
             }
 
             const success = await db.togglePost(postId, userId);
             
             if (success) {
-                const newStatus = post.is_active ? 'הוקפאה' : 'הופעלה';
+                // הסטטוס החדש הוא ההפך מהסטטוס הנוכחי
+                const newIsActive = !post.is_active;
+                const newStatus = newIsActive ? 'הופעלה' : 'הוקפאה';
                 const e = this.emojis;
                 
-                await this.bot.answerCallbackQuery(callbackQuery.id, 
-                    `${e ? '✅' : ''} המודעה ${newStatus} בהצלחה`
-                );
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                    text: `${e ? '✅' : ''} המודעה ${newStatus} בהצלחה`,
+                    show_alert: false
+                });
 
-                // עדכון הכפתורים
-                const newKeyboard = keyboards.getUserPostActionsKeyboard(postId, !post.is_active);
+                // עדכון הכפתורים עם הסטטוס החדש
+                const newKeyboard = keyboards.getUserPostActionsKeyboard(postId, newIsActive);
                 await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
                     chat_id: chatId,
                     message_id: callbackQuery.message.message_id
                 });
 
-                utils.logAction(userId, 'toggle_post', { postId, newStatus: !post.is_active });
+                utils.logAction(userId, 'toggle_post', { postId, newStatus: newIsActive });
             } else {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'שגיאה בעדכון המודעה');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                    text: 'שגיאה בעדכון המודעה',
+                    show_alert: true
+                });
             }
 
         } catch (error) {
@@ -385,7 +434,10 @@ class UserHandler {
             const post = await db.getPost(postId);
             
             if (!post || post.user_id !== userId) {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'אין הרשאה למחוק מודעה זו');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'אין הרשאה למחוק מודעה זו',
+                show_alert: false
+            });
                 return;
             }
 
@@ -403,7 +455,10 @@ class UserHandler {
                 ...keyboards.getDeleteConfirmKeyboard(postId)
             });
 
-            await this.bot.answerCallbackQuery(callbackQuery.id, 'נדרש אישור למחיקה');
+            await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'נדרש אישור למחיקה',
+                show_alert: false
+            });
             
         } catch (error) {
             utils.logError(error, 'confirmDeletePost');
@@ -420,7 +475,10 @@ class UserHandler {
             const post = await db.getPost(postId);
             
             if (!post || post.user_id !== userId) {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'אין הרשאה');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'אין הרשאה',
+                show_alert: false
+            });
                 return;
             }
 
@@ -433,14 +491,16 @@ class UserHandler {
                     {
                         chat_id: chatId,
                         message_id: callbackQuery.message.message_id,
-                        parse_mode: 'Markdown',
-                        ...keyboards.getMainKeyboard()
+                        parse_mode: 'Markdown'
                     }
                 );
 
                 utils.logAction(userId, 'delete_post', { postId, title: post.title });
             } else {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'שגיאה במחיקת המודעה');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'שגיאה במחיקת המודעה',
+                show_alert: false
+            });
             }
 
         } catch (error) {
@@ -459,7 +519,10 @@ class UserHandler {
             const post = await db.getPost(postId);
             
             if (!post) {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'המודעה לא נמצאה');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'המודעה לא נמצאה',
+                show_alert: false
+            });
                 return;
             }
 
@@ -477,9 +540,10 @@ class UserHandler {
                 ...keyboard
             });
 
-            await this.bot.answerCallbackQuery(callbackQuery.id, 
-                `${this.emojis ? '📞' : ''} פרטי קשר נחשפו`
-            );
+            await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: `${this.emojis ? '📞' : ''} פרטי קשר נחשפו`,
+                show_alert: false
+            });
 
             utils.logAction(userId, 'view_contact', { postId, postOwner: post.user_id });
 
@@ -491,23 +555,123 @@ class UserHandler {
 
     // ⭐ שמירת מודעות למועדפים
     async handleSavePost(callbackQuery) {
+        console.log('[DEBUG] handleSavePost called');
         const userId = callbackQuery.from.id;
+        const chatId = callbackQuery.message.chat.id;
         const postId = parseInt(callbackQuery.data.split('_')[1]);
 
         try {
-            // כאן יש לממש שמירה במסד נתונים
-            // לעת עתה נעשה רק tracking
-            this.trackInteraction(userId, postId, 'save');
-
-            await this.bot.answerCallbackQuery(callbackQuery.id, 
-                `${this.emojis ? '⭐' : ''} המודעה נשמרה למועדפים!`
-            );
-
-            utils.logAction(userId, 'save_post', { postId });
+            // בדיקה אם המודעה כבר שמורה
+            const isSaved = await db.isPostSaved(userId, postId);
+            console.log('[DEBUG] Save - Post is already saved:', isSaved);
+            
+            if (isSaved) {
+                // הסרה מהמועדפים
+                await db.unsavePost(userId, postId);
+                
+                // הודעה קופצת
+                try {
+                    console.log('[DEBUG] Trying to show unsave alert...');
+                    await this.bot.answerCallbackQuery(callbackQuery.id, {
+                        text: `💔 המודעה הוסרה מהמועדפים`,
+                        show_alert: false
+                    });
+                    console.log('[DEBUG] Unsave alert shown successfully');
+                } catch (alertErr) {
+                    console.error('[DEBUG] Error showing unsave alert:', alertErr.message);
+                }
+                
+                utils.logAction(userId, 'unsave_post', { postId });
+            } else {
+                // הוספה למועדפים
+                const result = await db.savePost(userId, postId);
+                if (result.saved) {
+                    // הודעה קופצת
+                    try {
+                        console.log('[DEBUG] Trying to show save alert...');
+                        await this.bot.answerCallbackQuery(callbackQuery.id, {
+                            text: `⭐ המודעה נשמרה למועדפים!`,
+                            show_alert: false
+                        });
+                        console.log('[DEBUG] Save alert shown successfully');
+                    } catch (alertErr) {
+                        console.error('[DEBUG] Error showing save alert:', alertErr.message);
+                    }
+                    
+                    utils.logAction(userId, 'save_post', { postId });
+                } else {
+                    try {
+                        await this.bot.answerCallbackQuery(callbackQuery.id, {
+                            text: `⚠️ המודעה כבר שמורה במועדפים`,
+                            show_alert: false
+                        });
+                    } catch (alertErr) {
+                        console.error('[DEBUG] Error showing already saved alert:', alertErr.message);
+                    }
+                }
+            }
+            
+            // עדכון tracking
+            this.trackInteraction(userId, postId, isSaved ? 'unsave' : 'save');
 
         } catch (error) {
             utils.logError(error, 'handleSavePost');
-            await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.featureInDevelopment);
+            await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: '❌ שגיאה בשמירת המודעה',
+                show_alert: true
+            });
+        }
+    }
+
+    // 📌 הצגת מועדפים
+    async showSavedPosts(chatId, userId) {
+        try {
+            const savedPosts = await db.getSavedPosts(userId);
+            
+            if (savedPosts.length === 0) {
+                await this.bot.sendMessage(chatId, 
+                    `${this.emojis ? '⭐' : ''} המועדפים שלכם\n\nעדיין לא שמרתם מודעות למועדפים.\n\nכדי לשמור מודעה, לחצו על כפתור "שמור" בכל מודעה שמעניינת אתכם.`,
+                    { 
+                        // לא משתמשים ב-Markdown כי זה גורם לבעיות
+                        // parse_mode: 'Markdown',
+                        ...keyboards.getMainKeyboard()
+                    }
+                );
+                return;
+            }
+
+            const e = this.emojis;
+            let message = `${e ? '⭐' : ''} המועדפים שלכם (${savedPosts.length})\n\n`;
+
+            // הצגת 10 מודעות ראשונות
+            const displayPosts = savedPosts.slice(0, 10);
+            
+            for (const post of displayPosts) {
+                const pricingStyle = config.getPricingStyle(post.pricing_mode);
+                const savedDate = new Date(post.saved_at).toLocaleDateString('he-IL');
+                
+                // מנקה את הכותרת מתווים בעייתיים
+                const cleanTitle = post.title.replace(/[_*\[\]()~`>#+\-=|{}.!\\]/g, '');
+                
+                message += `${e ? '📌' : '•'} ${cleanTitle}\n`;
+                message += `${e ? '💰' : ''} ${pricingStyle.name}\n`;
+                message += `${e ? '📅' : ''} נשמר ב: ${savedDate}\n`;
+                message += `${e ? '👁' : ''} /view_${post.id}\n\n`;
+            }
+
+            if (savedPosts.length > 10) {
+                message += `${e ? '📄' : '•'} מוצגות 10 מודעות ראשונות מתוך ${savedPosts.length}.`;
+            }
+
+            await this.bot.sendMessage(chatId, message, {
+                // לא משתמשים ב-Markdown כי זה גורם לבעיות
+                // parse_mode: 'Markdown',
+                ...keyboards.getMainKeyboard()
+            });
+
+        } catch (error) {
+            utils.logError(error, 'showSavedPosts');
+            await this.bot.sendMessage(chatId, config.messages.error);
         }
     }
 
@@ -522,7 +686,10 @@ class UserHandler {
             const post = await db.getPost(postId);
             
             if (!post) {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'המודעה לא נמצאה');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'המודעה לא נמצאה',
+                show_alert: false
+            });
                 return;
             }
 
@@ -549,9 +716,10 @@ class UserHandler {
                 }
             });
 
-            await this.bot.answerCallbackQuery(callbackQuery.id, 
-                `${this.emojis ? '📤' : ''} לינק לשיתוף נשלח!`
-            );
+            await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: `${this.emojis ? '📤' : ''} לינק לשיתוף נשלח!`,
+                show_alert: false
+            });
 
             utils.logAction(userId, 'share_post', { postId });
 
@@ -594,9 +762,10 @@ class UserHandler {
                 }
             });
 
-            await this.bot.answerCallbackQuery(callbackQuery.id, 
-                'אנא פרט את סיבת הדיווח'
-            );
+            await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'אנא פרט את סיבת הדיווח',
+                show_alert: false
+            });
 
             // הגדרת מצב המתנה לדיווח
             if (!this.userStates) {
@@ -634,7 +803,10 @@ class UserHandler {
                 message_id: callbackQuery.message.message_id
             });
 
-            await this.bot.answerCallbackQuery(callbackQuery.id, 'הדיווח בוטל');
+            await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'הדיווח בוטל',
+                show_alert: false
+            });
 
         } catch (error) {
             utils.logError(error, 'cancelReport');
@@ -701,15 +873,20 @@ class UserHandler {
 
     // 📊 סטטיסטיקות מודעה
     async showPostStats(callbackQuery) {
+        console.log('[DEBUG] showPostStats called');
         const chatId = callbackQuery.message.chat.id;
         const userId = callbackQuery.from.id;
         const postId = parseInt(callbackQuery.data.split('_')[1]);
 
         try {
             const post = await db.getPost(postId);
+            console.log('[DEBUG] Stats - Post found:', !!post, 'User match:', post?.user_id === userId);
             
             if (!post || post.user_id !== userId) {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'אין הרשאה');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'אין הרשאה',
+                show_alert: false
+            });
                 return;
             }
 

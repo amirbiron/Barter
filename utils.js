@@ -362,7 +362,13 @@ class Utils {
         const style = config.getPricingStyle(post.pricing_mode);
         const e = this.emojis;
         
-        let preview = `${e ? style.emoji + ' ' : ''}*${this.truncateText(post.title, 50)}*\n`;
+        // הוספת אינדיקציה אם המודעה מוקפאת
+        let statusIcon = '';
+        if (!post.is_active) {
+            statusIcon = `${e ? '⏸️ ' : '[מוקפאת] '}`;
+        }
+        
+        let preview = `${statusIcon}${e ? style.emoji + ' ' : ''}*${this.truncateText(post.title, 50)}*\n`;
         preview += `${this.truncateText(post.description, 100)}\n\n`;
         preview += `${e ? '💡' : '•'} ${style.name}`;
         

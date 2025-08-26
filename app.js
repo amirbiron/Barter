@@ -18,6 +18,15 @@ const bot = new TelegramBot(config.bot.token, {
 });
 
 console.log('🤖 הבוט מתחיל...');
+console.log('📌 גרסה: fix-all-issues-v3 - Fixed back button, persistent disk path, and deprecated callbacks');
+
+// הצג את הגדרות הסביבה החשובות
+if (process.env.RENDER) {
+    console.log('🌐 רץ על Render');
+}
+if (process.env.DATABASE_PATH) {
+    console.log(`📁 נתיב מותאם אישית למסד נתונים: ${process.env.DATABASE_PATH}`);
+}
 
 // מצבי משתמשים (לשמירת context של שיחות)
 const userStates = new Map();
@@ -162,6 +171,10 @@ bot.on('message', async (msg) => {
                 
             case (config.bot.useEmojis ? '📋 ' : '') + 'המודעות שלי':
                 await userHandler.showUserPostsDetailed(chatId, userId);
+                break;
+                
+            case (config.bot.useEmojis ? '⭐ ' : '') + 'מועדפים':
+                await userHandler.showSavedPosts(chatId, userId);
                 break;
                 
             default:
@@ -376,7 +389,10 @@ bot.on('callback_query', async (callbackQuery) => {
                     });
                     userHandler.trackInteraction(userId, postId, 'view');
                 } else {
-                    await bot.answerCallbackQuery(callbackQuery.id, 'המודעה לא נמצאה');
+                    await bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'המודעה לא נמצאה',
+                show_alert: false
+            });
                 }
             } else {
                 await handleBrowseSelection(chatId, data);
@@ -406,9 +422,75 @@ bot.on('callback_query', async (callbackQuery) => {
                 await userHandler.startEditingPost(callbackQuery);
             }
         } else if (data.startsWith('back_to_post_')) {
-            // חזרה מעריכה למודעה
+            // חזרה למודעה - בודק מאיפה באנו
             const postId = parseInt(data.replace('back_to_post_', ''));
-            await userHandler.showUserPostsDetailed(chatId, userId);
+            const post = await db.getPost(postId);
+            
+            if (post) {
+                // אם זו המודעה של המשתמש, הצג עם כפתורי ניהול
+                if (post.user_id === userId) {
+                    const message = utils.formatPostPreview(post);
+                    const keyboard = keyboards.getUserPostActionsKeyboard(post.id, post.is_active);
+                    
+                    await bot.editMessageText(message, {
+                        chat_id: chatId,
+                        message_id: msg.message_id,
+                        parse_mode: 'Markdown',
+                        ...keyboard
+                    });
+                } else {
+                    // אם זו מודעה של מישהו אחר, הצג עם כפתורי צפייה
+                    const postMessage = formatPostMessage(post);
+                    await bot.editMessageText(postMessage, {
+                        chat_id: chatId,
+                        message_id: msg.message_id,
+                        parse_mode: 'Markdown',
+                        ...getPostActionsKeyboard(postId)
+                    });
+                }
+                
+                await bot.answerCallbackQuery(callbackQuery.id);
+            } else {
+                await bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'המודעה לא נמצאה',
+                show_alert: false
+            });
+            }
+        } else if (data.startsWith('copy_contact_')) {
+            // העתקת פרטי קשר
+            const postId = parseInt(data.replace('copy_contact_', ''));
+            const post = await db.getPost(postId);
+            
+            if (post) {
+                // זיהוי סוג פרטי הקשר והוספת הוראות מתאימות
+                let instructions = '';
+                const contact = post.contact_info;
+                
+                if (contact.includes('@') && contact.includes('.')) {
+                    instructions = '📧 *אימייל:* לחצו על הטקסט למטה כדי להעתיק';
+                } else if (contact.includes('+') || /\d{3}-?\d{3}-?\d{4}/.test(contact)) {
+                    instructions = '📱 *טלפון:* לחצו על הטקסט למטה כדי להעתיק';
+                } else if (contact.includes('t.me/') || contact.startsWith('@')) {
+                    instructions = '💬 *טלגרם:* לחצו על הטקסט למטה כדי להעתיק';
+                } else {
+                    instructions = '📋 *פרטי קשר:* לחצו על הטקסט למטה כדי להעתיק';
+                }
+                
+                // שליחת הודעה עם פרטי הקשר שאפשר להעתיק
+                await bot.sendMessage(chatId, 
+                    `${instructions}\n\n\`${contact}\`\n\n_טיפ: אפשר גם ללחוץ לחיצה ארוכה על הטקסט ולבחור "העתק"_`,
+                    { parse_mode: 'Markdown' }
+                );
+                await bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'פרטי הקשר נשלחו בהודעה נפרדת',
+                show_alert: false
+            });
+            } else {
+                await bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'לא ניתן למצוא את פרטי הקשר',
+                show_alert: false
+            });
+            }
         } else if (data.startsWith('toggle_')) {
             await userHandler.togglePostStatus(callbackQuery);
         } else if (data.startsWith('delete_')) {
@@ -418,7 +500,10 @@ bot.on('callback_query', async (callbackQuery) => {
         } else if (data.startsWith('cancel_delete_')) {
             // ביטול מחיקה - חזרה למודעות שלי
             await userHandler.showUserPostsDetailed(chatId, userId);
-            await bot.answerCallbackQuery(callbackQuery.id, 'המחיקה בוטלה');
+            await bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'המחיקה בוטלה',
+                show_alert: false
+            });
         } else if (data.startsWith('stats_')) {
             await userHandler.showPostStats(callbackQuery);
         } else if (data === 'back_to_my_posts') {
@@ -430,14 +515,20 @@ bot.on('callback_query', async (callbackQuery) => {
             });
             clearUserState(userId);
         } else {
-            await bot.answerCallbackQuery(callbackQuery.id, config.messages.featureInDevelopment);
+            await bot.answerCallbackQuery(callbackQuery.id, {
+                text: config.messages.featureInDevelopment,
+                show_alert: false
+            });
         }
         
         utils.logAction(userId, 'callback_query', { action: data });
         
     } catch (error) {
         utils.logError(error, 'callback_query_handler');
-        await bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
+        await bot.answerCallbackQuery(callbackQuery.id, {
+            text: config.messages.error,
+            show_alert: true
+        });
     }
 });
 
