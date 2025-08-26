@@ -273,6 +273,34 @@ class UserHandler {
                 }
                 return { isValid: true, value: utils.sanitizeText(input) };
 
+            case 'pricing':
+                // טיפול במצב תמחור
+                const lowerInput = input.trim().toLowerCase();
+                let pricingMode = null;
+                
+                // בדיקה של האפשרויות השונות
+                if (lowerInput === 'בארטר' || lowerInput === 'החלפה' || lowerInput === 'barter') {
+                    pricingMode = 'barter';
+                } else if (lowerInput === 'תשלום' || lowerInput === 'כסף' || lowerInput === 'payment') {
+                    pricingMode = 'payment';
+                } else if (lowerInput === 'בארטר או תשלום' || lowerInput === 'שניהם' || lowerInput === 'both') {
+                    pricingMode = 'both';
+                } else if (lowerInput === 'חינם' || lowerInput === 'free') {
+                    pricingMode = 'free';
+                } else {
+                    return { 
+                        isValid: false, 
+                        error: 'מצב תמחור לא תקין. האפשרויות הן: בארטר, תשלום, בארטר או תשלום, חינם' 
+                    };
+                }
+                
+                const pricingStyle = config.getPricingStyle(pricingMode);
+                return { 
+                    isValid: true, 
+                    value: pricingMode,
+                    formatted: pricingStyle.name
+                };
+
             case 'tags':
                 const tags = utils.validateTags(input);
                 return { 
@@ -306,6 +334,7 @@ class UserHandler {
             const fieldMap = {
                 title: 'title',
                 desc: 'description',
+                pricing: 'pricing_mode',
                 tags: 'tags',
                 links: 'portfolio_links',
                 contact: 'contact_info'
@@ -495,19 +524,84 @@ class UserHandler {
         const postId = parseInt(callbackQuery.data.split('_')[1]);
 
         try {
-            // כאן יש לממש שמירה במסד נתונים
-            // לעת עתה נעשה רק tracking
-            this.trackInteraction(userId, postId, 'save');
-
-            await this.bot.answerCallbackQuery(callbackQuery.id, 
-                `${this.emojis ? '⭐' : ''} המודעה נשמרה למועדפים!`
-            );
-
-            utils.logAction(userId, 'save_post', { postId });
+            // בדיקה אם המודעה כבר שמורה
+            const isSaved = await db.isPostSaved(userId, postId);
+            
+            if (isSaved) {
+                // הסרה מהמועדפים
+                await db.unsavePost(userId, postId);
+                await this.bot.answerCallbackQuery(callbackQuery.id, 
+                    `${this.emojis ? '💔' : ''} המודעה הוסרה מהמועדפים`
+                );
+                utils.logAction(userId, 'unsave_post', { postId });
+            } else {
+                // הוספה למועדפים
+                const result = await db.savePost(userId, postId);
+                if (result.saved) {
+                    await this.bot.answerCallbackQuery(callbackQuery.id, 
+                        `${this.emojis ? '⭐' : ''} המודעה נשמרה למועדפים!`
+                    );
+                    utils.logAction(userId, 'save_post', { postId });
+                } else {
+                    await this.bot.answerCallbackQuery(callbackQuery.id, 
+                        `${this.emojis ? '⚠️' : ''} המודעה כבר שמורה במועדפים`
+                    );
+                }
+            }
+            
+            // עדכון tracking
+            this.trackInteraction(userId, postId, isSaved ? 'unsave' : 'save');
 
         } catch (error) {
             utils.logError(error, 'handleSavePost');
-            await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.featureInDevelopment);
+            await this.bot.answerCallbackQuery(callbackQuery.id, config.messages.error);
+        }
+    }
+
+    // 📌 הצגת מועדפים
+    async showSavedPosts(chatId, userId) {
+        try {
+            const savedPosts = await db.getSavedPosts(userId);
+            
+            if (savedPosts.length === 0) {
+                await this.bot.sendMessage(chatId, 
+                    `${this.emojis ? '⭐' : ''} *המועדפים שלכם*\n\nעדיין לא שמרתם מודעות למועדפים.\n\nכדי לשמור מודעה, לחצו על כפתור "שמור" בכל מודעה שמעניינת אתכם.`,
+                    { 
+                        parse_mode: 'Markdown',
+                        ...keyboards.getMainKeyboard()
+                    }
+                );
+                return;
+            }
+
+            const e = this.emojis;
+            let message = `${e ? '⭐' : ''} *המועדפים שלכם (${savedPosts.length})*\n\n`;
+
+            // הצגת 10 מודעות ראשונות
+            const displayPosts = savedPosts.slice(0, 10);
+            
+            for (const post of displayPosts) {
+                const pricingStyle = config.getPricingStyle(post.pricing_mode);
+                const savedDate = new Date(post.saved_at).toLocaleDateString('he-IL');
+                
+                message += `${e ? '📌' : '•'} *${utils.escapeMarkdown(post.title)}*\n`;
+                message += `${e ? '💰' : ''} ${pricingStyle.name}\n`;
+                message += `${e ? '📅' : ''} נשמר ב: ${savedDate}\n`;
+                message += `${e ? '👁' : ''} /view_${post.id}\n\n`;
+            }
+
+            if (savedPosts.length > 10) {
+                message += `${e ? '📄' : '•'} מוצגות 10 מודעות ראשונות מתוך ${savedPosts.length}.`;
+            }
+
+            await this.bot.sendMessage(chatId, message, {
+                parse_mode: 'Markdown',
+                ...keyboards.getMainKeyboard()
+            });
+
+        } catch (error) {
+            utils.logError(error, 'showSavedPosts');
+            await this.bot.sendMessage(chatId, config.messages.error);
         }
     }
 

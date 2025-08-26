@@ -115,6 +115,24 @@ class Database {
                     END
                 `);
 
+                // טבלת מועדפים - שמירת מודעות למשתמשים
+                this.db.run(`
+                    CREATE TABLE IF NOT EXISTS saved_posts (
+                        user_id INTEGER NOT NULL,
+                        post_id INTEGER NOT NULL,
+                        saved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (user_id, post_id),
+                        FOREIGN KEY (user_id) REFERENCES users (user_id),
+                        FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE
+                    )
+                `);
+
+                // אינדקס לשיפור ביצועים
+                this.db.run(`
+                    CREATE INDEX IF NOT EXISTS idx_saved_posts_user 
+                    ON saved_posts(user_id)
+                `);
+
                 console.log('✅ בסיס הנתונים הוכן בהצלחה');
                 resolve();
             });
@@ -304,6 +322,84 @@ class Database {
                     }));
                     resolve(results);
                 }
+            });
+        });
+    }
+
+    // פונקציות ניהול מועדפים
+    
+    // שמירת מודעה למועדפים
+    savePost(userId, postId) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                INSERT OR IGNORE INTO saved_posts (user_id, post_id)
+                VALUES (?, ?)
+            `;
+            this.db.run(sql, [userId, postId], function(err) {
+                if (err) reject(err);
+                else resolve({ saved: this.changes > 0 });
+            });
+        });
+    }
+
+    // הסרת מודעה מהמועדפים
+    unsavePost(userId, postId) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                DELETE FROM saved_posts 
+                WHERE user_id = ? AND post_id = ?
+            `;
+            this.db.run(sql, [userId, postId], function(err) {
+                if (err) reject(err);
+                else resolve({ removed: this.changes > 0 });
+            });
+        });
+    }
+
+    // בדיקה אם מודעה שמורה
+    isPostSaved(userId, postId) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                SELECT COUNT(*) as count 
+                FROM saved_posts 
+                WHERE user_id = ? AND post_id = ?
+            `;
+            this.db.get(sql, [userId, postId], (err, row) => {
+                if (err) reject(err);
+                else resolve(row.count > 0);
+            });
+        });
+    }
+
+    // קבלת כל המודעות השמורות של משתמש
+    getSavedPosts(userId) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                SELECT p.*, sp.saved_at
+                FROM posts p
+                INNER JOIN saved_posts sp ON p.id = sp.post_id
+                WHERE sp.user_id = ? AND p.is_active = 1
+                ORDER BY sp.saved_at DESC
+            `;
+            this.db.all(sql, [userId], (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows);
+            });
+        });
+    }
+
+    // ספירת מודעות שמורות
+    countSavedPosts(userId) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                SELECT COUNT(*) as count 
+                FROM saved_posts sp
+                INNER JOIN posts p ON p.id = sp.post_id
+                WHERE sp.user_id = ? AND p.is_active = 1
+            `;
+            this.db.get(sql, [userId], (err, row) => {
+                if (err) reject(err);
+                else resolve(row.count);
             });
         });
     }

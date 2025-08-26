@@ -164,6 +164,10 @@ bot.on('message', async (msg) => {
                 await userHandler.showUserPostsDetailed(chatId, userId);
                 break;
                 
+            case (config.bot.useEmojis ? '⭐ ' : '') + 'מועדפים':
+                await userHandler.showSavedPosts(chatId, userId);
+                break;
+                
             default:
                 // אם המשתמש במצב חיפוש
                 if (userState.step === 'search') {
@@ -406,9 +410,36 @@ bot.on('callback_query', async (callbackQuery) => {
                 await userHandler.startEditingPost(callbackQuery);
             }
         } else if (data.startsWith('back_to_post_')) {
-            // חזרה מעריכה למודעה
+            // חזרה מפרטי קשר למודעה
             const postId = parseInt(data.replace('back_to_post_', ''));
-            await userHandler.showUserPostsDetailed(chatId, userId);
+            const post = await db.getPost(postId);
+            
+            if (post && post.is_active) {
+                const postMessage = formatPostMessage(post);
+                await bot.editMessageText(postMessage, {
+                    chat_id: chatId,
+                    message_id: msg.message_id,
+                    parse_mode: 'Markdown',
+                    ...getPostActionsKeyboard(postId)
+                });
+            } else {
+                await bot.answerCallbackQuery(callbackQuery.id, 'המודעה לא נמצאה');
+            }
+        } else if (data.startsWith('copy_contact_')) {
+            // העתקת פרטי קשר
+            const postId = parseInt(data.replace('copy_contact_', ''));
+            const post = await db.getPost(postId);
+            
+            if (post) {
+                // שליחת הודעה עם פרטי הקשר שאפשר להעתיק
+                await bot.sendMessage(chatId, 
+                    `📋 *פרטי קשר להעתקה:*\n\n\`${post.contact_info}\`\n\n_לחצו על הטקסט למעלה כדי להעתיק_`,
+                    { parse_mode: 'Markdown' }
+                );
+                await bot.answerCallbackQuery(callbackQuery.id, 'פרטי הקשר נשלחו בהודעה נפרדת');
+            } else {
+                await bot.answerCallbackQuery(callbackQuery.id, 'לא ניתן למצוא את פרטי הקשר');
+            }
         } else if (data.startsWith('toggle_')) {
             await userHandler.togglePostStatus(callbackQuery);
         } else if (data.startsWith('delete_')) {
