@@ -18,7 +18,7 @@ const bot = new TelegramBot(config.bot.token, {
 });
 
 console.log('🤖 הבוט מתחיל...');
-console.log('📌 גרסה: cadbec9-debug - Fixed callback queries and contact URL validation');
+console.log('📌 גרסה: c08f67a - Fixed ALL callback queries and frozen post buttons');
 
 // מצבי משתמשים (לשמירת context של שיחות)
 const userStates = new Map();
@@ -360,7 +360,7 @@ bot.on('callback_query', async (callbackQuery) => {
     const data = callbackQuery.data;
     
     try {
-        await bot.answerCallbackQuery(callbackQuery.id, {});
+        await bot.answerCallbackQuery(callbackQuery.id);
         
         // ניתוב לפי סוג הפעולה
         if (data.startsWith('pricing_')) {

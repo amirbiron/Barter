@@ -97,7 +97,7 @@ class UserHandler {
                 }
             );
 
-            await this.bot.answerCallbackQuery(callbackQuery.id, {});
+            await this.bot.answerCallbackQuery(callbackQuery.id);
 
         } catch (error) {
             utils.logError(error, 'startEditingPost');
@@ -169,7 +169,7 @@ class UserHandler {
                 parse_mode: 'Markdown'
             });
 
-            await this.bot.answerCallbackQuery(callbackQuery.id, {});
+            await this.bot.answerCallbackQuery(callbackQuery.id);
 
             // ניקוי סשן עריכה אחרי timeout
             setTimeout(() => {
@@ -866,7 +866,7 @@ class UserHandler {
                 ...keyboards.getStatsKeyboard(postId)
             });
 
-            await this.bot.answerCallbackQuery(callbackQuery.id, {});
+            await this.bot.answerCallbackQuery(callbackQuery.id);
 
         } catch (error) {
             utils.logError(error, 'showPostStats');
