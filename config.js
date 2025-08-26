@@ -38,7 +38,11 @@ class Config {
                 timeout: parseInt(process.env.POLLING_TIMEOUT) || 10000,
                 interval: 1000,
                 autoStart: true
-            }
+            },
+            // רשימת מנהלים - ניתן להגדיר דרך משתנה סביבה ADMIN_IDS מופרד בפסיקים
+            adminIds: process.env.ADMIN_IDS ? 
+                process.env.ADMIN_IDS.split(',').map(id => parseInt(id.trim())) : 
+                []
         };
 
         // 🗃️ הגדרות בסיס נתונים
@@ -207,8 +211,9 @@ ${emojis ? '❓' : ''} *שאלות?* פנו למפתח: ${this.contacts.develope
     }
 
     // פונקציות עזר
+    // בדיקה אם משתמש הוא מנהל
     isAdmin(userId) {
-        return this.security.adminUserIds.includes(userId);
+        return this.bot.adminIds.includes(userId);
     }
 
     isProd() {

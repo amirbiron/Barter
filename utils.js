@@ -396,7 +396,11 @@ class Utils {
         const style = config.getPricingStyle(post.pricing_mode);
         const e = this.emojis;
         
-        let message = `${e ? style.emoji + ' ' : ''}*${post.title}*\n\n`;
+        // הוספת סימון למודעה פרטית
+        const visibilityIcon = post.visibility === 'private' ? '🔒 ' : '';
+        const visibilityNote = post.visibility === 'private' ? '\n\n🔒 *מודעת בדיקה (פרטית)* - לא מופיעה בחיפושים' : '';
+        
+        let message = `${visibilityIcon}${e ? style.emoji + ' ' : ''}*${post.title}*\n\n`;
         message += `📄 ${post.description}\n\n`;
         message += `${e ? '💡' : '•'} *מצב תמחור:* ${style.name}\n`;
         
@@ -415,12 +419,14 @@ class Utils {
             }
         }
         
-        if (showContact && post.contact_info) {
+        if (showContact) {
             message += `\n${e ? '📞' : '•'} *פרטי קשר:* ${post.contact_info}`;
         }
         
         message += `\n\n${e ? '👤' : '•'} *מפרסם:* ${post.first_name || post.username || 'אנונימי'}`;
         message += `\n${e ? '📅' : '•'} *פורסם:* ${this.formatDateTime(post.created_at)}`;
+        
+        message += visibilityNote; // הוספת הערת פרטיות בסוף
         
         return message;
     }
