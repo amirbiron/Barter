@@ -18,6 +18,7 @@ const bot = new TelegramBot(config.bot.token, {
 });
 
 console.log('🤖 הבוט מתחיל...');
+console.log('📌 גרסה: cadbec9-debug - Fixed callback queries and contact URL validation');
 
 // מצבי משתמשים (לשמירת context של שיחות)
 const userStates = new Map();

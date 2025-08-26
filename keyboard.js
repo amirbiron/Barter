@@ -198,6 +198,8 @@ class KeyboardManager {
     getContactActionsKeyboard(postId, contactInfo) {
         const e = this.emojis;
         
+        console.log(`[DEBUG] Contact info for post ${postId}: "${contactInfo}"`);
+        
         const buttons = [];
         
         // זיהוי סוג פרטי הקשר והוספת כפתורים מתאימים
@@ -206,12 +208,14 @@ class KeyboardManager {
         if (contactInfo.includes('@') && contactInfo.includes('.') && !contactInfo.includes(' ')) {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (emailRegex.test(contactInfo)) {
+                console.log(`[DEBUG] Detected as email: ${contactInfo}`);
                 buttons.push([{ text: `${e ? '📧 ' : ''}שלח אימייל`, url: `mailto:${contactInfo}` }]);
             }
         }
         
         // בדיקה אם זה טלפון
         if (contactInfo.includes('+') || /\d{3}-?\d{3}-?\d{4}/.test(contactInfo)) {
+            console.log(`[DEBUG] Detected as phone: ${contactInfo}`);
             // נראה כמו טלפון
             buttons.push([{ text: `${e ? '📱 ' : ''}התקשר`, url: `tel:${contactInfo.replace(/\D/g, '')}` }]);
         }
@@ -219,12 +223,16 @@ class KeyboardManager {
         // בדיקה אם זה טלגרם (t.me או @ אבל לא אימייל)
         if (contactInfo.includes('t.me/')) {
             const username = contactInfo.replace('https://t.me/', '').replace('t.me/', '');
+            console.log(`[DEBUG] Detected as Telegram link: ${username}`);
             buttons.push([{ text: `${e ? '💬 ' : ''}פנה בטלגרם`, url: `https://t.me/${username}` }]);
         } else if (contactInfo.startsWith('@')) {
             // אם מתחיל ב-@ זה שם משתמש טלגרם
             const username = contactInfo.replace('@', '');
+            console.log(`[DEBUG] Detected as Telegram username: ${username}`);
             buttons.push([{ text: `${e ? '💬 ' : ''}פנה בטלגרם`, url: `https://t.me/${username}` }]);
         }
+        
+        console.log(`[DEBUG] Generated ${buttons.length} action buttons`);
         
         // כפתור העתקה של פרטי הקשר
         buttons.push([{ text: `${e ? '📋 ' : ''}העתק פרטי קשר`, callback_data: `copy_contact_${postId}` }]);
