@@ -319,8 +319,10 @@ class Database {
         return new Promise((resolve, reject) => {
             console.log(`[DEBUG] togglePost called - postId: ${postId}, userId: ${userId}`);
             
+            const db = this.db; // שומר את הרפרנס
+            
             // קודם נבדוק מה המצב הנוכחי
-            this.db.get('SELECT is_active FROM posts WHERE id = ? AND user_id = ?', [postId, userId], (err, row) => {
+            db.get('SELECT is_active FROM posts WHERE id = ? AND user_id = ?', [postId, userId], (err, row) => {
                 if (err) {
                     console.error('[DEBUG] Error checking post status:', err);
                     reject(err);
@@ -336,21 +338,22 @@ class Database {
                     WHERE id = ? AND user_id = ?
                 `;
                 
-                this.db.run(sql, [postId, userId], function(err) {
+                db.run(sql, [postId, userId], function(err) {
                     if (err) {
                         console.error('[DEBUG] Error toggling post:', err);
                         reject(err);
                     } else {
-                        console.log(`[DEBUG] Toggle result - changes: ${this.changes}`);
+                        const changes = this.changes;
+                        console.log(`[DEBUG] Toggle result - changes: ${changes}`);
                         
                         // בדיקה אחרי העדכון
-                        this.db.get('SELECT id, is_active FROM posts WHERE id = ?', [postId], (err2, row2) => {
+                        db.get('SELECT id, is_active FROM posts WHERE id = ?', [postId], (err2, row2) => {
                             console.log(`[DEBUG] Post after toggle:`, row2);
                         });
                         
-                        resolve(this.changes > 0);
+                        resolve(changes > 0);
                     }
-                }.bind(this));
+                });
             });
         });
     }
