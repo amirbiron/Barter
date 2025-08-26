@@ -488,12 +488,12 @@ bot.on('message', async (msg) => {
                     clearUserState(userId);
                 } else if (userState.step === 'search_full') {
                     console.log('🔍 משתמש במצב חיפוש מלא, מבצע חיפוש...');
-                    await handleSearch(chatId, text);
+                    await handleSearch(chatId, text, userId);
                     clearUserState(userId);
                 } else if (userState.step === 'search') {
                     // תמיכה לאחור - חיפוש רגיל ישן
                     console.log('🔍 משתמש במצב חיפוש (ישן), מבצע חיפוש...');
-                    await handleSearch(chatId, text);
+                    await handleSearch(chatId, text, userId);
                     clearUserState(userId);
                 } else {
                     console.log('⚠️ פקודה לא מוכרת');
@@ -761,7 +761,7 @@ async function savePost(chatId, userId, postData) {
     }
 }
 
-async function handleSearch(chatId, query) {
+async function handleSearch(chatId, query, userId) {
     console.log(`🔍 handleSearch נקראת עבור chatId: ${chatId}, query: "${query}"`);
 
     try {
@@ -813,6 +813,7 @@ async function showBrowseOptions(chatId) {
     await bot.sendMessage(chatId, '📱 איך תרצו לדפדף?', getBrowseKeyboard());
 }
 
+// eslint-disable-next-line no-unused-vars
 async function showUserPosts(chatId, userId) {
     // מעביר ל-userHandler המתקדם יותר
     return userHandler.showUserPostsDetailed(chatId, userId);
@@ -913,7 +914,7 @@ bot.on('callback_query', async (callbackQuery) => {
         if (data.startsWith('pricing_')) {
             await handlePricingSelection(chatId, userId, data);
         } else if (data.startsWith('visibility_')) {
-            await handleVisibilitySelection(chatId, userId, data);
+            await handleVisibilitySelection(chatId, userId, data, callbackQuery.id);
         } else if (data.startsWith('view_post_')) {
             // Handler for viewing posts from browse list, search results, or alerts
             const parts = data.split('_');
@@ -1428,19 +1429,22 @@ bot.on('callback_query', async (callbackQuery) => {
         }
     } catch (error) {
         utils.logError(error, 'callback_query_handler');
-        await bot.answerCallbackQuery(callbackQuery.id, {
-            text: config.messages.error,
-            show_alert: true,
-        });
+        // eslint-disable-next-line no-empty
+        try {
+            await bot.answerCallbackQuery(callbackQuery.id, {
+                text: config.messages.error,
+                show_alert: true,
+            });
+        } catch (e) {}
     }
 });
 
-async function handleVisibilitySelection(chatId, userId, data) {
+async function handleVisibilitySelection(chatId, userId, data, callbackQueryId) {
     const visibility = data.replace('visibility_', '');
     const userState = getUserState(userId);
 
     if (userState.step !== 'visibility') {
-        await bot.answerCallbackQuery(callbackQuery.id, {
+        await bot.answerCallbackQuery(callbackQueryId, {
             text: 'פג תוקף הבחירה',
             show_alert: false,
         });

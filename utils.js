@@ -85,6 +85,7 @@ class Utils {
         if (!text) {return '';}
         // Escape MarkdownV2 special characters
         // See: https://core.telegram.org/bots/api#markdownv2-style
+        // eslint-disable-next-line no-useless-escape
         return text.replace(/([_\*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
     }
 

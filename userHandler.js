@@ -890,6 +890,7 @@ class UserHandler {
                 const savedDate = new Date(post.saved_at).toLocaleDateString('he-IL');
 
                 // מנקה את הכותרת מתווים בעייתיים
+                // eslint-disable-next-line no-useless-escape
                 const cleanTitle = post.title.replace(/[_*\[\]()~`>#+\-=|{}.!\\]/g, '');
 
                 message += `${e ? '📌' : '•'} ${cleanTitle}\n`;

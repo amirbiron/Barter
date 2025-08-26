@@ -67,7 +67,7 @@ async function main() {
         console.error('❌ Smoke test failed:', err);
         try {
             await db.close();
-        } catch (e) {}
+        } catch (e) { /* best-effort close */ }
         process.exit(1);
     }
 }
