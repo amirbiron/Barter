@@ -801,20 +801,27 @@ bot.on('callback_query', async (callbackQuery) => {
                     
                     // Create custom keyboard with back to browse button
                     const e = config.bot.useEmojis;
+                    const isAdmin = config.isAdmin(userId);
+                    const inline = [
+                        [
+                            { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
+                            { text: `${e ? '⭐ ' : ''}שמור`, callback_data: `save_${postId}` }
+                        ],
+                        [
+                            { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
+                            { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
+                        ]
+                    ];
+                    if (isAdmin) {
+                        inline.push([
+                            { text: `${e ? '🗑️ ' : ''}מחק מודעה`, callback_data: `admin_delete_${postId}` },
+                            { text: `${e ? '🔙 ' : ''}חזרה לרשימה`, callback_data: `browse_${browseType}_page_${page}` }
+                        ]);
+                    } else {
+                        inline.push([{ text: `${e ? '🔙 ' : ''}חזרה לרשימה`, callback_data: `browse_${browseType}_page_${page}` }]);
+                    }
                     const keyboard = {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [
-                                    { text: `${e ? '📞 ' : ''}צור קשר`, callback_data: `contact_${postId}` },
-                                    { text: `${e ? '⭐ ' : ''}שמור`, callback_data: `save_${postId}` }
-                                ],
-                                [
-                                    { text: `${e ? '🚨 ' : ''}דווח`, callback_data: `report_${postId}` },
-                                    { text: `${e ? '📤 ' : ''}שתף`, callback_data: `share_${postId}` }
-                                ],
-                                [{ text: `${e ? '🔙 ' : ''}חזרה לרשימה`, callback_data: `browse_${browseType}_page_${page}` }]
-                            ]
-                        }
+                        reply_markup: { inline_keyboard: inline }
                     };
                     
                     await bot.editMessageText(postMessage, {
