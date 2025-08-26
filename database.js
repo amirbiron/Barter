@@ -420,8 +420,13 @@ class Database {
                 VALUES (?, ?)
             `;
             this.db.run(sql, [userId, postId], function(err) {
-                if (err) reject(err);
-                else resolve({ saved: this.changes > 0 });
+                if (err) {
+                    console.error('[DEBUG] Error saving post:', err);
+                    reject(err);
+                } else {
+                    console.log(`[DEBUG] savePost - changes: ${this.changes}`);
+                    resolve({ saved: this.changes > 0 });
+                }
             });
         });
     }
@@ -434,8 +439,13 @@ class Database {
                 WHERE user_id = ? AND post_id = ?
             `;
             this.db.run(sql, [userId, postId], function(err) {
-                if (err) reject(err);
-                else resolve({ removed: this.changes > 0 });
+                if (err) {
+                    console.error('[DEBUG] Error unsaving post:', err);
+                    reject(err);
+                } else {
+                    console.log(`[DEBUG] unsavePost - changes: ${this.changes}`);
+                    resolve({ removed: this.changes > 0 });
+                }
             });
         });
     }
