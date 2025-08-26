@@ -238,15 +238,15 @@ class Database {
             let sql, params;
             
             if (query && query.trim()) {
-                // חיפוש בכותרות בלבד עם LIKE
+                // חיפוש בכותרות בלבד עם LIKE - מסנן מודעות פרטיות
                 sql = `
                     SELECT p.*, u.username, u.first_name
                     FROM posts p
                     JOIN users u ON p.user_id = u.user_id
                     WHERE p.title LIKE ? AND p.is_active = 1
-                    AND (p.visibility = 'public' OR p.user_id = ?)
+                    AND p.visibility = 'public'
                 `;
-                params = [`%${query}%`, filters.userId || 0];
+                params = [`%${query}%`];
                 console.log(`📌 חיפוש בכותרות: "${query}"`);
                 
                 // הוספת סינונים
@@ -255,16 +255,16 @@ class Database {
                 }
                 
             } else {
-                // אם אין חיפוש טקסט, הצג את כל המודעות
+                // אם אין חיפוש טקסט, הצג את כל המודעות הציבוריות
                 sql = `
                     SELECT p.*, u.username, u.first_name
                     FROM posts p
                     JOIN users u ON p.user_id = u.user_id
                     WHERE p.is_active = 1
-                    AND (p.visibility = 'public' OR p.user_id = ?)
+                    AND p.visibility = 'public'
                 `;
-                params = [filters.userId || 0];
-                console.log('📌 אין query - מחזיר את כל המודעות הפעילות');
+                params = [];
+                console.log('📌 אין query - מחזיר את כל המודעות הציבוריות');
                 
                 if (filters.pricingMode) {
                     sql += ` AND p.pricing_mode IN ('${filters.pricingMode}', 'both')`;
@@ -301,16 +301,16 @@ class Database {
             let sql, params;
             
             if (query && query.trim()) {
-                // חיפוש טקסט חופשי עם FTS5
+                // חיפוש טקסט חופשי עם FTS5 - מסנן מודעות פרטיות
                 sql = `
                     SELECT p.*, u.username, u.first_name
                     FROM posts_fts f
                     JOIN posts p ON f.rowid = p.id
                     JOIN users u ON p.user_id = u.user_id
                     WHERE posts_fts MATCH ? AND p.is_active = 1
-                    AND (p.visibility = 'public' OR p.user_id = ?)
+                    AND p.visibility = 'public'
                 `;
-                params = [query, filters.userId || 0];
+                params = [query];
                 console.log(`📊 משתמש ב-FTS5 לחיפוש: "${query}"`);
                 
                 // הוספת סינונים
@@ -319,16 +319,16 @@ class Database {
                 }
                 
             } else {
-                // אם אין חיפוש טקסט, הצג את כל המודעות
+                // אם אין חיפוש טקסט, הצג את כל המודעות הציבוריות
                 sql = `
                     SELECT p.*, u.username, u.first_name
                     FROM posts p
                     JOIN users u ON p.user_id = u.user_id
                     WHERE p.is_active = 1
-                    AND (p.visibility = 'public' OR p.user_id = ?)
+                    AND p.visibility = 'public'
                 `;
-                params = [filters.userId || 0];
-                console.log('📊 אין query - מחזיר את כל המודעות הפעילות');
+                params = [];
+                console.log('📊 אין query - מחזיר את כל המודעות הציבוריות');
                 
                 if (filters.pricingMode) {
                     sql += ` AND p.pricing_mode IN ('${filters.pricingMode}', 'both')`;

@@ -124,6 +124,43 @@ bot.onText(/\/help|ℹ️ עזרה/, async (msg) => {
     });
 });
 
+// פקודת עזרה
+bot.onText(/\/help/, async (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    
+    let helpMessage = config.messages.help;
+    
+    // הוספת פקודות מנהל אם המשתמש הוא מנהל
+    if (config.isAdmin(userId)) {
+        helpMessage += '\n\n*🔧 פקודות מנהל:*\n';
+        helpMessage += '• /testpost - יצירת מודעת בדיקה פרטית\n';
+        helpMessage += '• /stats - סטטיסטיקות המערכת';
+    }
+    
+    await bot.sendMessage(chatId, helpMessage, {
+        parse_mode: 'Markdown',
+        ...getMainKeyboard()
+    });
+});
+
+// פקודת מנהל - יצירת מודעת בדיקה
+bot.onText(/\/testpost/, async (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    
+    // בדיקת הרשאות
+    if (!config.isAdmin(userId)) {
+        await bot.sendMessage(chatId, '❌ פקודה זו זמינה למנהלים בלבד');
+        return;
+    }
+    
+    await bot.sendMessage(chatId, '🔧 *יצירת מודעת בדיקה (פרטית)*\n\nהקלידו את כותרת המודעה:', { 
+        parse_mode: 'Markdown' 
+    });
+    setUserState(userId, { step: 'title', isTestPost: true });
+});
+
 // טיפול בהודעות טקסט (תפריט ראשי)
 bot.on('message', async (msg) => {
     // אם זו פקודה, דלג (הטיפול בפקודות למעלה)
@@ -285,16 +322,16 @@ bot.on('message', async (msg) => {
                 // אם המשתמש במצב חיפוש
                 if (userState.step === 'search_titles') {
                     console.log('📌 משתמש במצב חיפוש כותרות, מבצע חיפוש...');
-                    await handleTitleSearch(chatId, text, userId);
+                    await handleTitleSearch(chatId, text);
                     clearUserState(userId);
                 } else if (userState.step === 'search_full') {
                     console.log('🔍 משתמש במצב חיפוש מלא, מבצע חיפוש...');
-                    await handleSearch(chatId, text, userId);
+                    await handleSearch(chatId, text);
                     clearUserState(userId);
                 } else if (userState.step === 'search') {
                     // תמיכה לאחור - חיפוש רגיל ישן
                     console.log('🔍 משתמש במצב חיפוש (ישן), מבצע חיפוש...');
-                    await handleSearch(chatId, text, userId);
+                    await handleSearch(chatId, text);
                     clearUserState(userId);
                 } else {
                     console.log('⚠️ פקודה לא מוכרת');
@@ -385,20 +422,27 @@ async function handlePostCreation(msg, userState) {
             
         case 'tags':
             const tags = utils.validateTags(text === 'דלג' ? '' : text);
-            setUserState(userId, { ...userState, step: 'visibility', tags });
             
-            // שלב חדש - בחירת visibility
-            await bot.sendMessage(chatId, '🔐 האם המודעה תהיה ציבורית או פרטית?\n\n' +
-                '• *ציבורית* - כולם יוכלו לראות את המודעה\n' +
-                '• *פרטית* - רק אתם תוכלו לראות (לבדיקות)', {
-                parse_mode: 'Markdown',
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '🌍 ציבורית', callback_data: 'visibility_public' }],
-                        [{ text: '🔒 פרטית (רק לי)', callback_data: 'visibility_private' }]
-                    ]
-                }
-            });
+            // בדיקה אם המשתמש הוא מנהל
+            if (config.isAdmin(userId)) {
+                setUserState(userId, { ...userState, step: 'visibility', tags });
+                
+                // שלב visibility - רק למנהלים
+                await bot.sendMessage(chatId, '🔐 האם המודעה תהיה ציבורית או פרטית?\n\n' +
+                    '• *ציבורית* - כולם יוכלו לראות את המודעה\n' +
+                    '• *פרטית* - מודעת בדיקה (רק למנהלים)', {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '🌍 ציבורית', callback_data: 'visibility_public' }],
+                            [{ text: '🔒 פרטית (בדיקה)', callback_data: 'visibility_private' }]
+                        ]
+                    }
+                });
+            } else {
+                // משתמשים רגילים - ישר לשמירה כמודעה ציבורית
+                await savePost(chatId, userId, { ...userState, tags, visibility: 'public' });
+            }
             break;
     }
 }
@@ -419,6 +463,9 @@ async function savePost(chatId, userId, postData) {
             return;
         }
 
+        // אם זו מודעת בדיקה מפקודת /testpost
+        const visibility = postData.isTestPost ? 'private' : (postData.visibility || 'public');
+
         const postId = await db.createPost({
             userId,
             title: utils.sanitizeText(postData.title),
@@ -428,11 +475,11 @@ async function savePost(chatId, userId, postData) {
             portfolioLinks: postData.portfolio_links,
             contactInfo: postData.contact_info,
             tags: postData.tags,
-            visibility: postData.visibility || 'public' // ברירת מחדל: ציבורית
+            visibility: visibility
         });
         
-        const visibilityMessage = postData.visibility === 'private' ? 
-            '\n\n🔒 *המודעה נשמרה כפרטית* - רק אתם יכולים לראות אותה' : '';
+        const visibilityMessage = visibility === 'private' ? 
+            '\n\n🔒 *מודעת בדיקה נשמרה* - לא תופיע בחיפושים' : '';
         
         await bot.sendMessage(chatId, config.messages.postCreated + visibilityMessage, {
             parse_mode: 'Markdown',
@@ -449,11 +496,11 @@ async function savePost(chatId, userId, postData) {
     }
 }
 
-async function handleSearch(chatId, query, userId) {
-    console.log(`🔍 handleSearch נקראת עבור chatId: ${chatId}, query: "${query}", userId: ${userId}`);
+async function handleSearch(chatId, query) {
+    console.log(`🔍 handleSearch נקראת עבור chatId: ${chatId}, query: "${query}"`);
     
     try {
-        const results = await db.searchPosts(query, { userId });
+        const results = await db.searchPosts(query);
         console.log(`📊 תוצאות חיפוש: ${results.length} מודעות נמצאו`);
         
         if (results.length === 0) {
@@ -502,12 +549,12 @@ async function showUserPosts(chatId, userId) {
     return userHandler.showUserPostsDetailed(chatId, userId);
 }
 
-async function handleTitleSearch(chatId, query, userId) {
-    console.log(`📌 handleTitleSearch נקראת עבור chatId: ${chatId}, query: "${query}", userId: ${userId}`);
+async function handleTitleSearch(chatId, query) {
+    console.log(`📌 handleTitleSearch נקראת עבור chatId: ${chatId}, query: "${query}"`);
     
     try {
         // חיפוש בכותרות בלבד
-        const results = await db.searchPostsByTitle(query, { userId });
+        const results = await db.searchPostsByTitle(query);
         console.log(`📊 תוצאות חיפוש כותרות: ${results.length} מודעות נמצאו`);
         
         if (results.length === 0) {
@@ -519,7 +566,7 @@ async function handleTitleSearch(chatId, query, userId) {
         // יצירת כפתורי inline עבור כל תוצאה
         const maxResults = 10; // מגבלת תוצאות לתצוגה
         const buttons = results.slice(0, maxResults).map(post => [{
-            text: `${post.visibility === 'private' ? '🔒' : ''} ${post.pricing_mode === 'barter' ? '🔄' : post.pricing_mode === 'payment' ? '💰' : '🔄💰'} ${post.title}`,
+            text: `${post.pricing_mode === 'barter' ? '🔄' : post.pricing_mode === 'payment' ? '💰' : '🔄💰'} ${post.title}`,
             callback_data: `view_post_${post.id}`
         }]);
         

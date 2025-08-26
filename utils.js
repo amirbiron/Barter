@@ -398,7 +398,7 @@ class Utils {
         
         // הוספת סימון למודעה פרטית
         const visibilityIcon = post.visibility === 'private' ? '🔒 ' : '';
-        const visibilityNote = post.visibility === 'private' ? '\n\n🔒 *מודעה פרטית* - רק אתם רואים אותה' : '';
+        const visibilityNote = post.visibility === 'private' ? '\n\n🔒 *מודעת בדיקה (פרטית)* - לא מופיעה בחיפושים' : '';
         
         let message = `${visibilityIcon}${e ? style.emoji + ' ' : ''}*${post.title}*\n\n`;
         message += `📄 ${post.description}\n\n`;
