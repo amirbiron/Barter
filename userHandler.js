@@ -68,14 +68,16 @@ class UserHandler {
         }
     }
 
-    // ✏️ עריכת מודעות
+    // ✏️ עריכה של מודעות
     async startEditingPost(callbackQuery) {
+        console.log('[DEBUG] startEditingPost called');
         const chatId = callbackQuery.message.chat.id;
         const userId = callbackQuery.from.id;
         const postId = parseInt(callbackQuery.data.split('_')[1]);
 
         try {
             const post = await db.getPost(postId);
+            console.log('[DEBUG] Post found:', !!post, 'User match:', post?.user_id === userId);
             
             if (!post || post.user_id !== userId) {
                 await this.bot.answerCallbackQuery(callbackQuery.id, {
@@ -370,12 +372,14 @@ class UserHandler {
 
     // 🔄 הפעלה/הקפאת מודעות
     async togglePostStatus(callbackQuery) {
+        console.log('[DEBUG] togglePostStatus called');
         const chatId = callbackQuery.message.chat.id;
         const userId = callbackQuery.from.id;
         const postId = parseInt(callbackQuery.data.split('_')[1]);
 
         try {
             const post = await db.getPost(postId);
+            console.log('[DEBUG] Toggle - Post found:', !!post, 'User match:', post?.user_id === userId);
             
             if (!post || post.user_id !== userId) {
                 await this.bot.answerCallbackQuery(callbackQuery.id, {
@@ -552,12 +556,14 @@ class UserHandler {
 
     // ⭐ שמירת מודעות למועדפים
     async handleSavePost(callbackQuery) {
+        console.log('[DEBUG] handleSavePost called');
         const userId = callbackQuery.from.id;
         const postId = parseInt(callbackQuery.data.split('_')[1]);
 
         try {
             // בדיקה אם המודעה כבר שמורה
             const isSaved = await db.isPostSaved(userId, postId);
+            console.log('[DEBUG] Save - Post is already saved:', isSaved);
             
             if (isSaved) {
                 // הסרה מהמועדפים
@@ -838,12 +844,14 @@ class UserHandler {
 
     // 📊 סטטיסטיקות מודעה
     async showPostStats(callbackQuery) {
+        console.log('[DEBUG] showPostStats called');
         const chatId = callbackQuery.message.chat.id;
         const userId = callbackQuery.from.id;
         const postId = parseInt(callbackQuery.data.split('_')[1]);
 
         try {
             const post = await db.getPost(postId);
+            console.log('[DEBUG] Stats - Post found:', !!post, 'User match:', post?.user_id === userId);
             
             if (!post || post.user_id !== userId) {
                 await this.bot.answerCallbackQuery(callbackQuery.id, {
