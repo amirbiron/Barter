@@ -44,7 +44,10 @@ class Config {
         // 🗃️ הגדרות בסיס נתונים
         this.database = {
             name: process.env.DB_NAME || 'barter_bot.db',
-            path: require('path').join(__dirname, process.env.DB_NAME || 'barter_bot.db')
+            // בודק אם אנחנו ב-Render עם דיסק מתמיד
+            path: process.env.RENDER && process.env.PERSISTENT_DISK_PATH ? 
+                require('path').join(process.env.PERSISTENT_DISK_PATH, process.env.DB_NAME || 'barter_bot.db') :
+                require('path').join(__dirname, process.env.DB_NAME || 'barter_bot.db')
         };
 
         // 📊 הגדרות תוכן

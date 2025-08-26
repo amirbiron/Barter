@@ -10,18 +10,49 @@ const getDatabasePath = () => {
         '/opt/render/project/data',  // נתיב נפוץ ב-Render
         '/var/data',                  // נתיב אפשרי אחר
         process.env.PERSISTENT_STORAGE_DIR, // אם הגדרת משתנה סביבה
+        process.env.PERSISTENT_DISK_PATH, // משתנה סביבה נוסף אפשרי
     ].filter(Boolean);
 
     // בדיקה איזה נתיב קיים וניתן לכתיבה
     for (const dirPath of possiblePaths) {
         try {
-            if (fs.existsSync(dirPath)) {
-                // בדיקה אם יש הרשאות כתיבה
-                fs.accessSync(dirPath, fs.constants.W_OK);
-                console.log(`📁 משתמש בדיסק קבוע: ${dirPath}`);
-                return path.join(dirPath, 'barter_bot.db');
+            // יצירת התיקייה אם לא קיימת
+            if (!fs.existsSync(dirPath)) {
+                try {
+                    fs.mkdirSync(dirPath, { recursive: true });
+                    console.log(`📁 נוצרה תיקייה: ${dirPath}`);
+                } catch (mkdirErr) {
+                    console.log(`⚠️ לא ניתן ליצור תיקייה: ${dirPath}`);
+                    continue;
+                }
             }
+            
+            // בדיקה אם יש הרשאות כתיבה
+            fs.accessSync(dirPath, fs.constants.W_OK);
+            console.log(`📁 משתמש בדיסק קבוע: ${dirPath}`);
+            
+            const dbPath = path.join(dirPath, 'barter_bot.db');
+            
+            // בדיקה אם הקובץ קיים ויש הרשאות כתיבה
+            if (fs.existsSync(dbPath)) {
+                try {
+                    fs.accessSync(dbPath, fs.constants.W_OK);
+                    console.log(`✅ קובץ מסד נתונים קיים עם הרשאות כתיבה`);
+                } catch (fileErr) {
+                    console.error(`❌ אין הרשאות כתיבה לקובץ: ${dbPath}`);
+                    // ננסה לשנות הרשאות
+                    try {
+                        fs.chmodSync(dbPath, 0o666);
+                        console.log(`✅ הרשאות הקובץ עודכנו`);
+                    } catch (chmodErr) {
+                        console.error(`❌ לא ניתן לשנות הרשאות: ${chmodErr.message}`);
+                    }
+                }
+            }
+            
+            return dbPath;
         } catch (err) {
+            console.log(`⚠️ אין גישה ל-${dirPath}: ${err.message}`);
             // המשך לנתיב הבא
         }
     }
