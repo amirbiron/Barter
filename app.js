@@ -862,10 +862,10 @@ bot.on('callback_query', async (callbackQuery) => {
                     if (isAdmin) {
                         inline.push([
                             { text: `${e ? '🗑️ ' : ''}מחק מודעה`, callback_data: `admin_delete_${postId}` },
-                            { text: `${e ? '🔙 ' : ''}חזרה להתראות`, callback_data: 'alert_menu' }
+                            { text: `${e ? '🔙 ' : ''}חזרה`, callback_data: `alert_back_${postId}` }
                         ]);
                     } else {
-                        inline.push([{ text: `${e ? '🔙 ' : ''}חזרה להתראות`, callback_data: 'alert_menu' }]);
+                        inline.push([{ text: `${e ? '🔙 ' : ''}חזרה`, callback_data: `alert_back_${postId}` }]);
                     }
                     
                     const keyboard = {
@@ -1199,6 +1199,47 @@ bot.on('callback_query', async (callbackQuery) => {
                     ...getPostActionsKeyboard(postId, userId)
                 });
                 userHandler.trackInteraction(userId, postId, 'view');
+            } else {
+                await bot.answerCallbackQuery(callbackQuery.id, {
+                    text: 'המודעה לא נמצאה',
+                    show_alert: true
+                });
+            }
+        } else if (data.startsWith('alert_back_')) {
+            // חזרה לצפייה בהתראה המקורית של המודעה
+            const postId = parseInt(data.replace('alert_back_', ''));
+            const post = await db.getPost(postId);
+            
+            if (post) {
+                const e = config.bot.useEmojis;
+                const keywords = await db.getSentAlertKeywordsForPost(userId, postId);
+                const keywordsList = keywords.length > 0 ? keywords.join(', ') : '';
+                
+                let message = '🔔 *התראה: מודעה חדשה!*\n\n';
+                if (keywordsList) {
+                    message += `נמצאה התאמה למילות המפתח: *${keywordsList}*\n`;
+                }
+                if (Array.isArray(post.tags) && post.tags.length > 0) {
+                    message += `🏷️ _תגיות:_ ${post.tags.join(', ')}\n`;
+                }
+                message += `\n📌 *${post.title}*\n`;
+                const desc = post.description || '';
+                message += `${desc.substring(0, 200)}${desc.length > 200 ? '...' : ''}\n\n`;
+                
+                await bot.editMessageText(message, {
+                    chat_id: chatId,
+                    message_id: msg.message_id,
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                { text: '👁️ צפה במודעה', callback_data: `view_post_${postId}_from_alert` },
+                                { text: '⭐ שמור', callback_data: `save_${postId}_from_alert` }
+                            ]
+                        ]
+                    }
+                });
+                await bot.answerCallbackQuery(callbackQuery.id);
             } else {
                 await bot.answerCallbackQuery(callbackQuery.id, {
                     text: 'המודעה לא נמצאה',

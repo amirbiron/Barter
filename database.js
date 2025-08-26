@@ -805,6 +805,26 @@ class Database {
         });
     }
 
+    // שליפת מילות המפתח שנשלחו עבור התראה למודעה מסוימת
+    getSentAlertKeywordsForPost(userId, postId) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                SELECT keyword
+                FROM sent_alerts
+                WHERE user_id = ? AND post_id = ?
+                ORDER BY sent_at ASC
+            `;
+            this.db.all(sql, [userId, postId], (err, rows) => {
+                if (err) {
+                    console.error('שגיאה בשליפת מילות מפתח להתראה:', err);
+                    reject(err);
+                } else {
+                    resolve((rows || []).map(r => r.keyword));
+                }
+            });
+        });
+    }
+
     // ניקוי התראות ישנות (אופציונלי - למחוק התראות ישנות מ-30 יום)
     cleanOldAlerts() {
         return new Promise((resolve, reject) => {
