@@ -729,9 +729,12 @@ class Database {
     }
 
     // בדיקה האם מודעה מכילה מילות מפתח של משתמשים
-    checkPostForKeywords(postId, postTitle, postDescription) {
+    checkPostForKeywords(postId, postTitle, postDescription, postTags = []) {
         return new Promise((resolve, reject) => {
+            // הכן טקסט לבדיקה: כותרת + תיאור + תגיות
             const postText = `${postTitle} ${postDescription}`.toLowerCase();
+            const tagsText = Array.isArray(postTags) ? postTags.join(' ').toLowerCase() : '';
+            const fullText = `${postText} ${tagsText}`;
             
             const sql = `
                 SELECT DISTINCT ka.user_id, ka.keyword
@@ -751,10 +754,19 @@ class Database {
                     console.error('שגיאה בבדיקת מילות מפתח:', err);
                     reject(err);
                 } else {
-                    // סינון מילות מפתח שנמצאות בטקסט
-                    const matches = rows.filter(row => 
-                        postText.includes(row.keyword.toLowerCase())
-                    );
+                    // סינון מילות מפתח שנמצאות בטקסט או בתגיות
+                    const matches = rows.filter(row => {
+                        const keyword = row.keyword.toLowerCase();
+                        const foundInContent = postText.includes(keyword);
+                        const foundInTags = tagsText.includes(keyword);
+                        
+                        if (foundInContent || foundInTags) {
+                            // הוסף מידע על מקור ההתאמה
+                            row.matchSource = foundInTags && !foundInContent ? 'tags' : 'content';
+                            return true;
+                        }
+                        return false;
+                    });
                     resolve(matches);
                 }
             });

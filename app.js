@@ -599,7 +599,8 @@ async function savePost(chatId, userId, postData) {
                 postId, 
                 postData.title, 
                 postData.description,
-                userId
+                userId,
+                postData.tags || []
             );
         }
         
@@ -1410,10 +1411,10 @@ async function handleReplaceAllKeywords(chatId, userId) {
 }
 
 // בדיקה ושליחת התראות למודעה חדשה
-async function checkAndSendAlerts(postId, postTitle, postDescription, postUserId) {
+async function checkAndSendAlerts(postId, postTitle, postDescription, postUserId, postTags = []) {
     try {
         // מצא משתמשים עם מילות מפתח רלוונטיות
-        const matches = await db.checkPostForKeywords(postId, postTitle, postDescription);
+        const matches = await db.checkPostForKeywords(postId, postTitle, postDescription, postTags);
         
         if (matches.length > 0) {
             console.log(`🔔 נמצאו ${matches.length} התאמות למילות מפתח עבור מודעה ${postId}`);
@@ -1422,19 +1423,31 @@ async function checkAndSendAlerts(postId, postTitle, postDescription, postUserId
             const userAlerts = {};
             for (const match of matches) {
                 if (!userAlerts[match.user_id]) {
-                    userAlerts[match.user_id] = [];
+                    userAlerts[match.user_id] = {
+                        keywords: [],
+                        hasTagMatch: false
+                    };
                 }
-                userAlerts[match.user_id].push(match.keyword);
+                userAlerts[match.user_id].keywords.push(match.keyword);
+                if (match.matchSource === 'tags') {
+                    userAlerts[match.user_id].hasTagMatch = true;
+                }
             }
             
             // שלח התראה לכל משתמש
-            for (const [userId, keywords] of Object.entries(userAlerts)) {
+            for (const [userId, alertInfo] of Object.entries(userAlerts)) {
                 try {
-                    const keywordsList = keywords.join(', ');
+                    const keywordsList = alertInfo.keywords.join(', ');
                     
                     let message = '🔔 *התראה: מודעה חדשה!*\n\n';
-                    message += `נמצאה התאמה למילות המפתח: *${keywordsList}*\n\n`;
-                    message += `📌 *${postTitle}*\n`;
+                    message += `נמצאה התאמה למילות המפתח: *${keywordsList}*\n`;
+                    
+                    // הוסף אינדיקציה אם ההתאמה נמצאה בתגיות
+                    if (alertInfo.hasTagMatch) {
+                        message += `🏷️ _התאמה נמצאה גם בתגיות המודעה_\n`;
+                    }
+                    
+                    message += `\n📌 *${postTitle}*\n`;
                     message += `${postDescription.substring(0, 200)}${postDescription.length > 200 ? '...' : ''}\n\n`;
                     
                     await bot.sendMessage(userId, message, {
@@ -1450,7 +1463,7 @@ async function checkAndSendAlerts(postId, postTitle, postDescription, postUserId
                     });
                     
                     // רשום שההתראה נשלחה
-                    for (const keyword of keywords) {
+                    for (const keyword of alertInfo.keywords) {
                         await db.recordSentAlert(userId, postId, keyword);
                     }
                     
