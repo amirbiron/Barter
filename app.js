@@ -206,6 +206,16 @@ bot.on('message', async (msg) => {
     const userId = msg.from.id;
     const text = msg.text;
     
+    // תחזוקה גלובלית: חסימת אינטראקציות והצגת הודעה ידידותית
+    if (process.env.MAINTENANCE_MODE === 'true') {
+        await bot.sendMessage(chatId,
+            '🔧 הבוט בתהליך עדכון קצר כרגע...\n\n' +
+            'אנא נסו שוב בעוד כדקה...',
+            getMainKeyboard()
+        );
+        return;
+    }
+    
     // לוגים לאבחון
     console.log(`📨 קיבלתי הודעה מ-${userId}: "${text}"`);
     console.log(`🔧 config.bot.useEmojis = ${config.bot.useEmojis}`);
@@ -219,6 +229,7 @@ bot.on('message', async (msg) => {
                 userStates.set(userId, persisted);
                 userState = persisted;
                 console.log(`♻️ שוחזר מצב משתמש מה-DB:`, userState);
+                // אל תציג הודעת המשך בזמן תחזוקה
                 await bot.sendMessage(chatId, '✅ המשכנו מאיפה שעצרת');
             }
         } catch (e) {
@@ -759,6 +770,22 @@ bot.on('callback_query', async (callbackQuery) => {
     const chatId = msg.chat.id;
     const userId = callbackQuery.from.id;
     const data = callbackQuery.data;
+    
+    // תחזוקה גלובלית: חסימת אינטראקציות והצגת הודעה ידידותית
+    if (process.env.MAINTENANCE_MODE === 'true') {
+        try {
+            await bot.answerCallbackQuery(callbackQuery.id, {
+                text: '🔧 תחזוקה קלה, נסו שוב בעוד כדקה',
+                show_alert: true
+            });
+        } catch (e) {}
+        await bot.sendMessage(chatId,
+            '🔧 הבוט בתהליך עדכון קצר כרגע...\n\n' +
+            'אנא נסו שוב בעוד כדקה...',
+            getMainKeyboard()
+        );
+        return;
+    }
     
     // שחזור מצב משתמש אם לא קיים בזיכרון
     if (!userStates.has(userId)) {
