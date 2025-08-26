@@ -1038,7 +1038,7 @@ async function handleBrowseSelection(chatId, data, messageId = null, page = 1) {
             navRow.push({ text: e ? '◀️ הקודם' : '< הקודם', callback_data: `browse_${browseType}_page_${page - 1}` });
         }
         
-        navRow.push({ text: `${page}/${totalPages}`, callback_data: 'noop' });
+        navRow.push({ text: `עמוד ${page}`, callback_data: 'noop' });
         
         if (page < totalPages) {
             navRow.push({ text: e ? 'הבא ▶️' : 'הבא >', callback_data: `browse_${browseType}_page_${page + 1}` });

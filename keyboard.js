@@ -245,7 +245,7 @@ class KeyboardManager {
             firstRow.push({ text: `${e ? '◀️' : '<'}`, callback_data: `${baseCallback}_page_${currentPage - 1}` });
         }
         
-        firstRow.push({ text: `📄 ${currentPage}/${totalPages}`, callback_data: 'noop' });
+        firstRow.push({ text: `📄 עמוד ${currentPage}`, callback_data: 'noop' });
         
         if (currentPage < totalPages) {
             firstRow.push({ text: `${e ? '▶️' : '>'}`, callback_data: `${baseCallback}_page_${currentPage + 1}` });
