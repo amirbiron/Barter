@@ -68,7 +68,7 @@ class Database {
                         user_id INTEGER NOT NULL,
                         title TEXT NOT NULL,
                         description TEXT NOT NULL,
-                        pricing_mode TEXT CHECK(pricing_mode IN ('barter', 'payment', 'both')) NOT NULL,
+                        pricing_mode TEXT CHECK(pricing_mode IN ('barter', 'payment', 'both', 'free')) NOT NULL,
                         price_range TEXT,
                         portfolio_links TEXT,
                         contact_info TEXT NOT NULL,
@@ -125,13 +125,21 @@ class Database {
                         FOREIGN KEY (user_id) REFERENCES users (user_id),
                         FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE
                     )
-                `);
+                `, (err) => {
+                    if (err && !err.message.includes('already exists')) {
+                        console.error('שגיאה ביצירת טבלת saved_posts:', err);
+                    }
+                });
 
                 // אינדקס לשיפור ביצועים
                 this.db.run(`
                     CREATE INDEX IF NOT EXISTS idx_saved_posts_user 
                     ON saved_posts(user_id)
-                `);
+                `, (err) => {
+                    if (err && !err.message.includes('already exists')) {
+                        console.error('שגיאה ביצירת אינדקס:', err);
+                    }
+                });
 
                 console.log('✅ בסיס הנתונים הוכן בהצלחה');
                 resolve();
