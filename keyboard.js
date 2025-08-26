@@ -109,23 +109,33 @@ class KeyboardManager {
     getUserPostActionsKeyboard(postId, isActive = true) {
         const e = this.emojis;
         
+        const buttons = [
+            [
+                { text: `${e ? '✏️ ' : ''}ערוך`, callback_data: `edit_${postId}` },
+                { 
+                    text: isActive ? `${e ? '⏸️ ' : ''}הקפא` : `${e ? '▶️ ' : ''}הפעל`, 
+                    callback_data: `toggle_${postId}` 
+                }
+            ],
+            [
+                { text: `${e ? '📊 ' : ''}סטטיסטיקה`, callback_data: `stats_${postId}` }
+            ]
+        ];
+        
+        // הוסף כפתור שתף רק למודעות פעילות
+        if (isActive) {
+            buttons[1].push({ text: `${e ? '🔗 ' : ''}שתף`, callback_data: `share_own_${postId}` });
+        }
+        
+        // הוסף כפתורי מחיקה וחזרה
+        buttons.push(
+            [{ text: `${e ? '🗑️ ' : ''}מחק`, callback_data: `delete_${postId}` }],
+            [{ text: `${e ? '🔙 ' : ''}חזרה`, callback_data: 'back_to_my_posts' }]
+        );
+        
         return {
             reply_markup: {
-                inline_keyboard: [
-                    [
-                        { text: `${e ? '✏️ ' : ''}ערוך`, callback_data: `edit_${postId}` },
-                        { 
-                            text: isActive ? `${e ? '⏸️ ' : ''}הקפא` : `${e ? '▶️ ' : ''}הפעל`, 
-                            callback_data: `toggle_${postId}` 
-                        }
-                    ],
-                    [
-                        { text: `${e ? '📊 ' : ''}סטטיסטיקה`, callback_data: `stats_${postId}` },
-                        { text: `${e ? '🔗 ' : ''}שתף`, callback_data: `share_own_${postId}` }
-                    ],
-                    [{ text: `${e ? '🗑️ ' : ''}מחק`, callback_data: `delete_${postId}` }],
-                    [{ text: `${e ? '🔙 ' : ''}חזרה`, callback_data: 'back_to_my_posts' }]
-                ]
+                inline_keyboard: buttons
             }
         };
     }

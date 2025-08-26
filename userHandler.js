@@ -78,9 +78,10 @@ class UserHandler {
             const post = await db.getPost(postId);
             
             if (!post || post.user_id !== userId) {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 
-                    `${this.emojis ? '❌' : ''} המודעה לא נמצאה או שאין לכם הרשאה לערוך אותה`
-                );
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: `${this.emojis ? '❌' : ''} המודעה לא נמצאה או שאין לכם הרשאה לערוך אותה`,
+                show_alert: false
+            });
                 return;
             }
 
@@ -96,7 +97,7 @@ class UserHandler {
                 }
             );
 
-            await this.bot.answerCallbackQuery(callbackQuery.id);
+            await this.bot.answerCallbackQuery(callbackQuery.id, {});
 
         } catch (error) {
             utils.logError(error, 'startEditingPost');
@@ -130,7 +131,10 @@ class UserHandler {
             field = 'contact';
             postId = parseInt(data.replace('edit_contact_', ''));
         } else {
-            await this.bot.answerCallbackQuery(callbackQuery.id, 'שדה עריכה לא מוכר');
+            await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'שדה עריכה לא מוכר',
+                show_alert: false
+            });
             return;
         }
 
@@ -138,7 +142,10 @@ class UserHandler {
             const post = await db.getPost(postId);
             
             if (!post || post.user_id !== userId) {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'אין הרשאה');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'אין הרשאה',
+                show_alert: false
+            });
                 return;
             }
 
@@ -162,7 +169,7 @@ class UserHandler {
                 parse_mode: 'Markdown'
             });
 
-            await this.bot.answerCallbackQuery(callbackQuery.id);
+            await this.bot.answerCallbackQuery(callbackQuery.id, {});
 
             // ניקוי סשן עריכה אחרי timeout
             setTimeout(() => {
@@ -371,7 +378,10 @@ class UserHandler {
             const post = await db.getPost(postId);
             
             if (!post || post.user_id !== userId) {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'אין הרשאה');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'אין הרשאה',
+                show_alert: false
+            });
                 return;
             }
 
@@ -420,7 +430,10 @@ class UserHandler {
             const post = await db.getPost(postId);
             
             if (!post || post.user_id !== userId) {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'אין הרשאה למחוק מודעה זו');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'אין הרשאה למחוק מודעה זו',
+                show_alert: false
+            });
                 return;
             }
 
@@ -438,7 +451,10 @@ class UserHandler {
                 ...keyboards.getDeleteConfirmKeyboard(postId)
             });
 
-            await this.bot.answerCallbackQuery(callbackQuery.id, 'נדרש אישור למחיקה');
+            await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'נדרש אישור למחיקה',
+                show_alert: false
+            });
             
         } catch (error) {
             utils.logError(error, 'confirmDeletePost');
@@ -455,7 +471,10 @@ class UserHandler {
             const post = await db.getPost(postId);
             
             if (!post || post.user_id !== userId) {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'אין הרשאה');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'אין הרשאה',
+                show_alert: false
+            });
                 return;
             }
 
@@ -475,7 +494,10 @@ class UserHandler {
 
                 utils.logAction(userId, 'delete_post', { postId, title: post.title });
             } else {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'שגיאה במחיקת המודעה');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'שגיאה במחיקת המודעה',
+                show_alert: false
+            });
             }
 
         } catch (error) {
@@ -494,7 +516,10 @@ class UserHandler {
             const post = await db.getPost(postId);
             
             if (!post) {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'המודעה לא נמצאה');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'המודעה לא נמצאה',
+                show_alert: false
+            });
                 return;
             }
 
@@ -626,7 +651,10 @@ class UserHandler {
             const post = await db.getPost(postId);
             
             if (!post) {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'המודעה לא נמצאה');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'המודעה לא נמצאה',
+                show_alert: false
+            });
                 return;
             }
 
@@ -653,9 +681,10 @@ class UserHandler {
                 }
             });
 
-            await this.bot.answerCallbackQuery(callbackQuery.id, 
-                `${this.emojis ? '📤' : ''} לינק לשיתוף נשלח!`
-            );
+            await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: `${this.emojis ? '📤' : ''} לינק לשיתוף נשלח!`,
+                show_alert: false
+            });
 
             utils.logAction(userId, 'share_post', { postId });
 
@@ -698,9 +727,10 @@ class UserHandler {
                 }
             });
 
-            await this.bot.answerCallbackQuery(callbackQuery.id, 
-                'אנא פרט את סיבת הדיווח'
-            );
+            await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'אנא פרט את סיבת הדיווח',
+                show_alert: false
+            });
 
             // הגדרת מצב המתנה לדיווח
             if (!this.userStates) {
@@ -738,7 +768,10 @@ class UserHandler {
                 message_id: callbackQuery.message.message_id
             });
 
-            await this.bot.answerCallbackQuery(callbackQuery.id, 'הדיווח בוטל');
+            await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'הדיווח בוטל',
+                show_alert: false
+            });
 
         } catch (error) {
             utils.logError(error, 'cancelReport');
@@ -813,7 +846,10 @@ class UserHandler {
             const post = await db.getPost(postId);
             
             if (!post || post.user_id !== userId) {
-                await this.bot.answerCallbackQuery(callbackQuery.id, 'אין הרשאה');
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'אין הרשאה',
+                show_alert: false
+            });
                 return;
             }
 
@@ -830,7 +866,7 @@ class UserHandler {
                 ...keyboards.getStatsKeyboard(postId)
             });
 
-            await this.bot.answerCallbackQuery(callbackQuery.id);
+            await this.bot.answerCallbackQuery(callbackQuery.id, {});
 
         } catch (error) {
             utils.logError(error, 'showPostStats');

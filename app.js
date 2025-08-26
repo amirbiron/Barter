@@ -360,7 +360,7 @@ bot.on('callback_query', async (callbackQuery) => {
     const data = callbackQuery.data;
     
     try {
-        await bot.answerCallbackQuery(callbackQuery.id);
+        await bot.answerCallbackQuery(callbackQuery.id, {});
         
         // ניתוב לפי סוג הפעולה
         if (data.startsWith('pricing_')) {
@@ -381,7 +381,10 @@ bot.on('callback_query', async (callbackQuery) => {
                     });
                     userHandler.trackInteraction(userId, postId, 'view');
                 } else {
-                    await bot.answerCallbackQuery(callbackQuery.id, 'המודעה לא נמצאה');
+                    await bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'המודעה לא נמצאה',
+                show_alert: false
+            });
                 }
             } else {
                 await handleBrowseSelection(chatId, data);
@@ -424,7 +427,10 @@ bot.on('callback_query', async (callbackQuery) => {
                     ...getPostActionsKeyboard(postId)
                 });
             } else {
-                await bot.answerCallbackQuery(callbackQuery.id, 'המודעה לא נמצאה');
+                await bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'המודעה לא נמצאה',
+                show_alert: false
+            });
             }
         } else if (data.startsWith('copy_contact_')) {
             // העתקת פרטי קשר
@@ -451,9 +457,15 @@ bot.on('callback_query', async (callbackQuery) => {
                     `${instructions}\n\n\`${contact}\`\n\n_טיפ: אפשר גם ללחוץ לחיצה ארוכה על הטקסט ולבחור "העתק"_`,
                     { parse_mode: 'Markdown' }
                 );
-                await bot.answerCallbackQuery(callbackQuery.id, 'פרטי הקשר נשלחו בהודעה נפרדת');
+                await bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'פרטי הקשר נשלחו בהודעה נפרדת',
+                show_alert: false
+            });
             } else {
-                await bot.answerCallbackQuery(callbackQuery.id, 'לא ניתן למצוא את פרטי הקשר');
+                await bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'לא ניתן למצוא את פרטי הקשר',
+                show_alert: false
+            });
             }
         } else if (data.startsWith('toggle_')) {
             await userHandler.togglePostStatus(callbackQuery);
@@ -464,7 +476,10 @@ bot.on('callback_query', async (callbackQuery) => {
         } else if (data.startsWith('cancel_delete_')) {
             // ביטול מחיקה - חזרה למודעות שלי
             await userHandler.showUserPostsDetailed(chatId, userId);
-            await bot.answerCallbackQuery(callbackQuery.id, 'המחיקה בוטלה');
+            await bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'המחיקה בוטלה',
+                show_alert: false
+            });
         } else if (data.startsWith('stats_')) {
             await userHandler.showPostStats(callbackQuery);
         } else if (data === 'back_to_my_posts') {
