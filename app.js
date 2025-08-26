@@ -226,9 +226,35 @@ bot.on('message', async (msg) => {
         
         // בדיקה אם המשתמש באמצע תהליך התראות
         if (userState.step === 'alert_add_keyword') {
-            // הוספת מילת מפתח
-            const result = await db.addKeywordAlert(userId, text);
-            await bot.sendMessage(chatId, `✅ ${result.message}`, getMainKeyboard());
+            // הוספת מילות מפתח - תמיכה גם במילה בודדת וגם ברשימה מופרדת בפסיקים
+            const keywords = text.split(',').map(k => k.trim()).filter(k => k);
+            
+            if (keywords.length === 0) {
+                await bot.sendMessage(chatId, '⚠️ לא הוזנו מילות מפתח תקינות', getMainKeyboard());
+            } else {
+                let successCount = 0;
+                let existingCount = 0;
+                
+                for (const keyword of keywords) {
+                    const result = await db.addKeywordAlert(userId, keyword);
+                    if (result.success) {
+                        successCount++;
+                    } else {
+                        existingCount++;
+                    }
+                }
+                
+                let message = '';
+                if (successCount > 0 && existingCount > 0) {
+                    message = `✅ נוספו ${successCount} מילות מפתח חדשות\n⚠️ ${existingCount} מילות כבר היו קיימות`;
+                } else if (successCount > 0) {
+                    message = `✅ נוספו ${successCount} מילות מפתח חדשות`;
+                } else {
+                    message = `⚠️ כל המילות כבר קיימות במערכת`;
+                }
+                
+                await bot.sendMessage(chatId, message, getMainKeyboard());
+            }
             clearUserState(userId);
             return;
         } else if (userState.step === 'alert_replace_all') {
@@ -1188,9 +1214,13 @@ async function handleAddKeyword(chatId, userId) {
     });
     
     await bot.sendMessage(chatId, 
-        '✏️ *הוספת מילת מפתח*\n\n' +
-        'הקלד את המילה או הביטוי שברצונך לעקוב אחריו:\n\n' +
-        '_דוגמאות: "עיצוב גרפי", "תכנות", "צילום", "React"_',
+        '✏️ *הוספת מילות מפתח*\n\n' +
+        'הקלד מילה, ביטוי או רשימה מופרדת בפסיקים:\n\n' +
+        '📌 *דוגמאות:*\n' +
+        '• מילה בודדת: `עיצוב`\n' +
+        '• ביטוי: `עיצוב גרפי`\n' +
+        '• רשימה: `עיצוב, פוטושופ, לוגו, React`\n\n' +
+        '_המערכת תוסיף את כל המילות החדשות לרשימה שלך_',
         {
             parse_mode: 'Markdown',
             ...keyboards.getCancelKeyboard()
