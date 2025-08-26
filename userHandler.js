@@ -204,16 +204,9 @@ class UserHandler {
     }
 
     getPricingOptionsText(currentMode) {
-        switch (currentMode) {
-            case 'barter':
-                return 'תשלום / בארטר או תשלום';
-            case 'payment':
-                return 'בארטר / בארטר או תשלום';
-            case 'both':
-                return 'בארטר / תשלום';
-            default:
-                return 'בארטר / תשלום';
-        }
+        const modes = ['barter', 'payment', 'both', 'free'];
+        const others = modes.filter(mode => mode !== currentMode);
+        return others.map(mode => config.getPricingStyle(mode).name).join(' / ');
     }
 
     async processEditInput(msg) {

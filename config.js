@@ -99,7 +99,8 @@ class Config {
             colors: {
                 barter: process.env.BARTER_COLOR || '#4CAF50',
                 payment: process.env.PAYMENT_COLOR || '#FF9800', 
-                both: process.env.BOTH_COLOR || '#9C27B0'
+                both: process.env.BOTH_COLOR || '#9C27B0',
+                free: process.env.FREE_COLOR || '#03A9F4'
             }
         };
 
@@ -251,7 +252,7 @@ ${emojis ? '❓' : ''} *שאלות?* פנו למפתח: ${this.contacts.develope
         }
 
         // בדיקת מצב תמחור
-        if (!['barter', 'payment', 'both'].includes(postData.pricingMode)) {
+        if (!['barter', 'payment', 'both', 'free'].includes(postData.pricingMode)) {
             errors.push('מצב תמחור לא תקין');
         }
 
@@ -285,6 +286,11 @@ ${emojis ? '❓' : ''} *שאלות?* פנו למפתח: ${this.contacts.develope
                 emoji: '🔄💰',
                 name: 'בארטר או תשלום',
                 color: this.ui.colors.both
+            },
+            free: {
+                emoji: '🆓',
+                name: 'חינם',
+                color: this.ui.colors.free
             }
         };
 

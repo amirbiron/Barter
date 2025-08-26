@@ -36,6 +36,7 @@ class KeyboardManager {
                     [{ text: `${e ? '🔄 ' : ''}בארטר`, callback_data: 'pricing_barter' }],
                     [{ text: `${e ? '💰 ' : ''}תשלום`, callback_data: 'pricing_payment' }],
                     [{ text: `${e ? '🔄💰 ' : ''}שניהם`, callback_data: 'pricing_both' }],
+                    [{ text: `${e ? '🆓 ' : ''}חינם`, callback_data: 'pricing_free' }],
                     [{ text: `${e ? '🔙 ' : ''}חזרה`, callback_data: 'back_to_main' }]
                 ]
             }
