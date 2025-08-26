@@ -90,7 +90,8 @@ class Config {
         // 🌐 הגדרות שרת
         this.server = {
             port: parseInt(process.env.PORT) || 3000,
-            nodeEnv: process.env.NODE_ENV || 'development'
+            nodeEnv: process.env.NODE_ENV || 'development',
+            timezone: process.env.TIMEZONE || 'Asia/Jerusalem'
         };
 
         // 🎨 הגדרות ממשק
@@ -98,7 +99,8 @@ class Config {
             colors: {
                 barter: process.env.BARTER_COLOR || '#4CAF50',
                 payment: process.env.PAYMENT_COLOR || '#FF9800', 
-                both: process.env.BOTH_COLOR || '#9C27B0'
+                both: process.env.BOTH_COLOR || '#9C27B0',
+                free: process.env.FREE_COLOR || '#03A9F4'
             }
         };
 
@@ -112,6 +114,11 @@ class Config {
             enableContactSharing: true,
             enableReporting: true,
             enableFavorites: true
+        };
+
+        // 👤 פרטי קשר
+        this.contacts = {
+            developerHandle: process.env.DEVELOPER_HANDLE || '@moominAmir'
         };
 
         // 📝 תבניות הודעות
@@ -182,7 +189,7 @@ ${emojis ? '💡' : ''} *טיפים:*
 • הוסיפו תגיות רלוונטיות לחיפוש טוב יותר
 • כתבו תיאור מפורט של השירות
 
-${emojis ? '❓' : ''} *שאלות?* פנו למפתח
+${emojis ? '❓' : ''} *שאלות?* פנו למפתח: ${this.contacts.developerHandle}
             `,
 
             noResults: `${emojis ? '🔍' : ''} לא נמצאו תוצאות לחיפוש שלכם.\n\nנסו מילות מפתח אחרות.`,
@@ -193,7 +200,7 @@ ${emojis ? '❓' : ''} *שאלות?* פנו למפתח
 
             unknownCommand: `${emojis ? '❓' : ''} לא הבנתי. בחרו אפשרות מהתפריט:`,
 
-            noUserPosts: `${emojis ? '📋' : ''} אין לכם מודעות פעילות.\n\nלחצו על "${emojis ? '📝' : ''}פרסום שירות" ליצירת מודעה ראשונה!`,
+            noUserPosts: `${emojis ? '📋' : ''} אין לכם מודעות פעילות.\n\nלחצו על \"${emojis ? '📝' : ''}פרסום שירות\" ליצירת מודעה ראשונה!`,
 
             featureInDevelopment: `${emojis ? '🚧' : ''} התכונה עוד בפיתוח`
         };
@@ -245,7 +252,7 @@ ${emojis ? '❓' : ''} *שאלות?* פנו למפתח
         }
 
         // בדיקת מצב תמחור
-        if (!['barter', 'payment', 'both'].includes(postData.pricingMode)) {
+        if (!['barter', 'payment', 'both', 'free'].includes(postData.pricingMode)) {
             errors.push('מצב תמחור לא תקין');
         }
 
@@ -279,6 +286,11 @@ ${emojis ? '❓' : ''} *שאלות?* פנו למפתח
                 emoji: '🔄💰',
                 name: 'בארטר או תשלום',
                 color: this.ui.colors.both
+            },
+            free: {
+                emoji: '🆓',
+                name: 'חינם',
+                color: this.ui.colors.free
             }
         };
 

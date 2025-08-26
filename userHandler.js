@@ -189,16 +189,24 @@ class UserHandler {
     getEditInstructions(field, post) {
         const e = this.emojis;
         
+        const pricingOptionsText = this.getPricingOptionsText(post.pricing_mode);
+        
         const instructions = {
             title: `${e ? '📝' : ''} *עריכת כותרת*\n\nכותרת נוכחית: "${post.title}"\n\nהקלידו כותרת חדשה:`,
             desc: `${e ? '📄' : ''} *עריכת תיאור*\n\nתיאור נוכחי: "${utils.truncateText(post.description, 200)}"\n\nהקלידו תיאור חדש:`,
-            pricing: `${e ? '💰' : ''} *עריכת מצב תמחור*\n\nמצב נוכחי: ${config.getPricingStyle(post.pricing_mode).name}\n\nבחרו מצב חדש:`,
+            pricing: `${e ? '💰' : ''} *עריכת מצב תמחור*\n\nמצב נוכחי: ${config.getPricingStyle(post.pricing_mode).name}\n\nבחרו מצב חדש: ${pricingOptionsText}`,
             tags: `${e ? '🏷️' : ''} *עריכת תגיות*\n\nתגיות נוכחיות: ${utils.formatTags(post.tags)}\n\nהקלידו תגיות חדשות (מופרדות בפסיק):`,
             links: `${e ? '🔗' : ''} *עריכת קישורים*\n\nקישורים נוכחיים: ${post.portfolio_links || 'אין'}\n\nהקלידו קישורים חדשים:`,
             contact: `${e ? '📞' : ''} *עריכת פרטי קשר*\n\nפרטי קשר נוכחיים: "${post.contact_info}"\n\nהקלידו פרטי קשר חדשים:`
         };
 
         return instructions[field] || 'עריכה לא מוכרת';
+    }
+
+    getPricingOptionsText(currentMode) {
+        const modes = ['barter', 'payment', 'both', 'free'];
+        const others = modes.filter(mode => mode !== currentMode);
+        return others.map(mode => config.getPricingStyle(mode).name).join(' / ');
     }
 
     async processEditInput(msg) {
@@ -581,6 +589,17 @@ class UserHandler {
                     console.error('[DEBUG] Error showing unsave alert:', alertErr.message);
                 }
                 
+                // עדכון כפתור שמירה בהודעה
+                try {
+                    const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, false);
+                    await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
+                        chat_id: chatId,
+                        message_id: callbackQuery.message.message_id
+                    });
+                } catch (kbErr) {
+                    console.error('[DEBUG] Error updating save button (unsave):', kbErr.message);
+                }
+                
                 utils.logAction(userId, 'unsave_post', { postId });
             } else {
                 // הוספה למועדפים
@@ -598,6 +617,17 @@ class UserHandler {
                         console.error('[DEBUG] Error showing save alert:', alertErr.message);
                     }
                     
+                    // עדכון כפתור שמירה בהודעה
+                    try {
+                        const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, true);
+                        await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
+                            chat_id: chatId,
+                            message_id: callbackQuery.message.message_id
+                        });
+                    } catch (kbErr) {
+                        console.error('[DEBUG] Error updating save button (save):', kbErr.message);
+                    }
+                    
                     utils.logAction(userId, 'save_post', { postId });
                 } else {
                     try {
@@ -607,6 +637,17 @@ class UserHandler {
                         });
                     } catch (alertErr) {
                         console.error('[DEBUG] Error showing already saved alert:', alertErr.message);
+                    }
+                    
+                    // וודא שהכפתור מציג מצב "שמורה"
+                    try {
+                        const newKeyboard = keyboards.getPostActionsKeyboardWithSaveStatus(postId, true);
+                        await this.bot.editMessageReplyMarkup(newKeyboard.reply_markup, {
+                            chat_id: chatId,
+                            message_id: callbackQuery.message.message_id
+                        });
+                    } catch (kbErr) {
+                        console.error('[DEBUG] Error updating save button (already saved):', kbErr.message);
                     }
                 }
             }
