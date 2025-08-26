@@ -437,6 +437,17 @@ bot.on('message', async (msg) => {
 
 // פונקציות עיקריות
 async function startPostCreation(chatId, userId) {
+    // תחזוקה: חסימת יצירת מודעה בזמן דיפלוי/תחזוקה
+    if (process.env.MAINTENANCE_MODE === 'true') {
+        await bot.sendMessage(chatId,
+            '🔧 הבוט בתהליך עדכון קצר כרגע.\n\n' +
+            'אנא נסו שוב בעוד כמה דקות.\n\n' +
+            'טיפ: הטקסט שהקלדתם לא נשמר, אז מומלץ להעתיק לפני סגירה.',
+            getMainKeyboard()
+        );
+        return;
+    }
+    
     // בדיקת מגבלת מודעות למשתמש
     const userPosts = await db.getUserPosts(userId);
     const activePostsCount = userPosts.filter(post => !post.deleted_at).length;
@@ -465,6 +476,18 @@ async function handlePostCreation(msg, userState) {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     const text = msg.text;
+    
+    // תחזוקה: עצירת תהליך פרסום בזמן דיפלוי/תחזוקה
+    if (process.env.MAINTENANCE_MODE === 'true') {
+        await bot.sendMessage(chatId,
+            '🔧 כרגע מתבצע עדכון קצר למערכת.\n\n' +
+            'ההתקדמות בתהליך פרסום נעצרה זמנית.\n' +
+            'אנא נסו שוב בעוד מספר דקות.',
+            getMainKeyboard()
+        );
+        clearUserState(userId);
+        return;
+    }
     
     switch (userState.step) {
         case 'title':
