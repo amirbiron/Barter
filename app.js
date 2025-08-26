@@ -224,6 +224,30 @@ bot.on('message', async (msg) => {
             return;
         }
         
+        // בדיקה אם המשתמש באמצע תהליך התראות
+        if (userState.step === 'alert_add_keyword') {
+            // הוספת מילת מפתח
+            const result = await db.addKeywordAlert(userId, text);
+            await bot.sendMessage(chatId, `✅ ${result.message}`, getMainKeyboard());
+            clearUserState(userId);
+            return;
+        } else if (userState.step === 'alert_replace_all') {
+            // החלפת כל מילות המפתח
+            const keywords = text.split(',').map(k => k.trim()).filter(k => k);
+            
+            if (keywords.length === 0) {
+                await bot.sendMessage(chatId, '⚠️ לא הוזנו מילות מפתח תקינות', getMainKeyboard());
+            } else {
+                const result = await db.setUserKeywords(userId, keywords);
+                await bot.sendMessage(chatId, 
+                    `✅ הוגדרו ${result.count} מילות מפתח חדשות:\n${keywords.join(', ')}`,
+                    getMainKeyboard()
+                );
+            }
+            clearUserState(userId);
+            return;
+        }
+        
         // אם המשתמש באמצע תהליך פרסום (לא כולל חיפוש)
         const searchStates = ['search', 'search_type', 'search_titles', 'search_full'];
         if (userState.step && userState.step !== 'main' && !searchStates.includes(userState.step)) {
@@ -303,6 +327,11 @@ bot.on('message', async (msg) => {
             case (config.bot.useEmojis ? '⭐ ' : '') + 'מועדפים':
                 console.log('✅ זוהה: מועדפים');
                 await userHandler.showSavedPosts(chatId, userId);
+                break;
+                
+            case (config.bot.useEmojis ? '🔔 ' : '') + 'התראות':
+                console.log('✅ זוהה: התראות');
+                await handleAlertsMenu(chatId, userId);
                 break;
                 
             case (config.bot.useEmojis ? 'ℹ️ ' : '') + 'עזרה':
@@ -536,6 +565,16 @@ async function savePost(chatId, userId, postData) {
             parse_mode: 'Markdown',
             ...getMainKeyboard()
         });
+        
+        // בדיקה ושליחת התראות למשתמשים עם מילות מפתח רלוונטיות
+        if (visibility === 'public') {
+            await checkAndSendAlerts(
+                postId, 
+                postData.title, 
+                postData.description,
+                userId
+            );
+        }
         
         clearUserState(userId);
         utils.logAction(userId, 'post_created', { postId, title: postData.title });
@@ -882,15 +921,38 @@ bot.on('callback_query', async (callbackQuery) => {
                 message_id: msg.message_id
             });
             clearUserState(userId);
-        } else {
-            await bot.answerCallbackQuery(callbackQuery.id, {
-                text: config.messages.featureInDevelopment,
-                show_alert: false
-            });
+        } else if (data.startsWith('alert_')) {
+            // טיפול בפעולות התראות
+            const alertAction = data.replace('alert_', '');
+            
+            if (alertAction === 'menu') {
+                await handleAlertsMenu(chatId, userId);
+            } else if (alertAction === 'add_keyword') {
+                await handleAddKeyword(chatId, userId);
+            } else if (alertAction === 'show_keywords') {
+                await handleShowKeywords(chatId, userId);
+            } else if (alertAction === 'remove_keyword') {
+                await handleRemoveKeyword(chatId, userId);
+            } else if (alertAction === 'replace_all') {
+                await handleReplaceAllKeywords(chatId, userId);
+            } else if (alertAction.startsWith('delete_')) {
+                // מחיקת מילת מפתח ספציפית
+                const keyword = alertAction.replace('delete_', '');
+                const result = await db.removeKeywordAlert(userId, keyword);
+                
+                await bot.answerCallbackQuery(callbackQuery.id, {
+                    text: result.message,
+                    show_alert: true
+                });
+                
+                // רענן את הרשימה
+                await handleRemoveKeyword(chatId, userId);
+            }
+        } else if (data === 'cancel_operation') {
+            // ביטול פעולה
+            clearUserState(userId);
+            await bot.sendMessage(chatId, '❌ הפעולה בוטלה', getMainKeyboard());
         }
-        
-        utils.logAction(userId, 'callback_query', { action: data });
-        
     } catch (error) {
         utils.logError(error, 'callback_query_handler');
         await bot.answerCallbackQuery(callbackQuery.id, {
@@ -1086,6 +1148,225 @@ async function handleBrowseSelection(chatId, data, messageId = null, page = 1) {
     }
 }
 
+// ===============================================
+// 🔔 פונקציות ניהול התראות
+// ===============================================
+
+// הצגת תפריט התראות
+async function handleAlertsMenu(chatId, userId) {
+    try {
+        const keywords = await db.getUserKeywords(userId);
+        const keywordCount = keywords.length;
+        
+        let message = '🔔 *ניהול התראות*\n\n';
+        message += 'קבל התראה כשמתפרסמת מודעה חדשה עם מילות המפתח שלך.\n\n';
+        
+        if (keywordCount > 0) {
+            message += `📌 *מילות מפתח פעילות (${keywordCount}):*\n`;
+            keywords.forEach(kw => {
+                message += `• ${kw.keyword}\n`;
+            });
+        } else {
+            message += '_אין לך מילות מפתח מוגדרות כרגע._';
+        }
+        
+        await bot.sendMessage(chatId, message, {
+            parse_mode: 'Markdown',
+            ...keyboards.getAlertsMenuKeyboard()
+        });
+    } catch (error) {
+        console.error('שגיאה בהצגת תפריט התראות:', error);
+        await bot.sendMessage(chatId, 'אירעה שגיאה. נסה שוב מאוחר יותר.');
+    }
+}
+
+// הוספת מילת מפתח
+async function handleAddKeyword(chatId, userId) {
+    setUserState(userId, { 
+        step: 'alert_add_keyword',
+        data: {} 
+    });
+    
+    await bot.sendMessage(chatId, 
+        '✏️ *הוספת מילת מפתח*\n\n' +
+        'הקלד את המילה או הביטוי שברצונך לעקוב אחריו:\n\n' +
+        '_דוגמאות: "עיצוב גרפי", "תכנות", "צילום", "React"_',
+        {
+            parse_mode: 'Markdown',
+            ...keyboards.getCancelKeyboard()
+        }
+    );
+}
+
+// הצגת מילות מפתח
+async function handleShowKeywords(chatId, userId) {
+    try {
+        const keywords = await db.getUserKeywords(userId);
+        
+        if (keywords.length === 0) {
+            await bot.sendMessage(chatId, 
+                '📭 אין לך מילות מפתח מוגדרות כרגע.\n\n' +
+                'השתמש בכפתור "הוסף מילת מפתח" כדי להתחיל לקבל התראות.',
+                keyboards.getAlertsMenuKeyboard()
+            );
+        } else {
+            let message = '📋 *מילות המפתח שלך:*\n\n';
+            keywords.forEach((kw, index) => {
+                const date = new Date(kw.created_at).toLocaleDateString('he-IL');
+                message += `${index + 1}. *${kw.keyword}*\n   _נוספה: ${date}_\n\n`;
+            });
+            
+            message += '\nלחץ על "מחק מילת מפתח" כדי להסיר מילים.';
+            
+            await bot.sendMessage(chatId, message, {
+                parse_mode: 'Markdown',
+                ...keyboards.getAlertsMenuKeyboard()
+            });
+        }
+    } catch (error) {
+        console.error('שגיאה בהצגת מילות מפתח:', error);
+        await bot.sendMessage(chatId, 'אירעה שגיאה. נסה שוב מאוחר יותר.');
+    }
+}
+
+// מחיקת מילת מפתח
+async function handleRemoveKeyword(chatId, userId) {
+    try {
+        const keywords = await db.getUserKeywords(userId);
+        
+        if (keywords.length === 0) {
+            await bot.sendMessage(chatId, 
+                '📭 אין לך מילות מפתח למחיקה.',
+                keyboards.getAlertsMenuKeyboard()
+            );
+        } else {
+            await bot.sendMessage(chatId, 
+                '🗑️ *מחיקת מילת מפתח*\n\n' +
+                'לחץ על המילה שברצונך למחוק:',
+                {
+                    parse_mode: 'Markdown',
+                    ...keyboards.getKeywordManagementKeyboard(keywords)
+                }
+            );
+        }
+    } catch (error) {
+        console.error('שגיאה במחיקת מילת מפתח:', error);
+        await bot.sendMessage(chatId, 'אירעה שגיאה. נסה שוב מאוחר יותר.');
+    }
+}
+
+// החלפת כל מילות המפתח
+async function handleReplaceAllKeywords(chatId, userId) {
+    setUserState(userId, { 
+        step: 'alert_replace_all',
+        data: {} 
+    });
+    
+    await bot.sendMessage(chatId, 
+        '🔄 *החלפת כל מילות המפתח*\n\n' +
+        'הקלד את כל מילות המפתח החדשות מופרדות בפסיקים:\n\n' +
+        '_דוגמה: עיצוב גרפי, תכנות, React, Node.js_\n\n' +
+        '⚠️ *שים לב:* פעולה זו תמחק את כל המילות הקיימות!',
+        {
+            parse_mode: 'Markdown',
+            ...keyboards.getCancelKeyboard()
+        }
+    );
+}
+
+// בדיקה ושליחת התראות למודעה חדשה
+async function checkAndSendAlerts(postId, postTitle, postDescription, postUserId) {
+    try {
+        // מצא משתמשים עם מילות מפתח רלוונטיות
+        const matches = await db.checkPostForKeywords(postId, postTitle, postDescription);
+        
+        if (matches.length > 0) {
+            console.log(`🔔 נמצאו ${matches.length} התאמות למילות מפתח עבור מודעה ${postId}`);
+            
+            // קבוצת ההתראות לפי משתמש
+            const userAlerts = {};
+            for (const match of matches) {
+                if (!userAlerts[match.user_id]) {
+                    userAlerts[match.user_id] = [];
+                }
+                userAlerts[match.user_id].push(match.keyword);
+            }
+            
+            // שלח התראה לכל משתמש
+            for (const [userId, keywords] of Object.entries(userAlerts)) {
+                try {
+                    const keywordsList = keywords.join(', ');
+                    
+                    let message = '🔔 *התראה: מודעה חדשה!*\n\n';
+                    message += `נמצאה התאמה למילות המפתח: *${keywordsList}*\n\n`;
+                    message += `📌 *${postTitle}*\n`;
+                    message += `${postDescription.substring(0, 200)}${postDescription.length > 200 ? '...' : ''}\n\n`;
+                    
+                    await bot.sendMessage(userId, message, {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    { text: '👁️ צפה במודעה', callback_data: `view_${postId}` },
+                                    { text: '⭐ שמור', callback_data: `save_${postId}` }
+                                ]
+                            ]
+                        }
+                    });
+                    
+                    // רשום שההתראה נשלחה
+                    for (const keyword of keywords) {
+                        await db.recordSentAlert(userId, postId, keyword);
+                    }
+                    
+                    console.log(`✅ התראה נשלחה למשתמש ${userId} עבור מודעה ${postId}`);
+                } catch (error) {
+                    console.error(`שגיאה בשליחת התראה למשתמש ${userId}:`, error);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('שגיאה בבדיקת התראות:', error);
+    }
+}
+
+// ===============================================
+// 🎯 הפעלת הבוט
+// ===============================================
+
+console.log('✅ הבוט פועל ומוכן לקבלת הודעות!');
+console.log(`🔧 מצב debug: ${config.bot.debugMode ? 'פעיל' : 'כבוי'}`);
+console.log(`🗃️ מיקום DB: ${config.database.path}`);
+
+if (config.bot.debugMode) {
+    console.log('📊 מידע מערכת:', JSON.stringify(utils.getSystemInfo(), null, 2));
+}
+
+// הוספת שרת HTTP פשוט כדי שהדיפלוי יזהה פורט פתוח
+const http = require('http');
+const PORT = process.env.PORT || 3000;
+
+const server = http.createServer((req, res) => {
+    // Health check endpoint
+    if (req.url === '/health' || req.url === '/') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            status: 'ok',
+            service: 'telegram-barter-bot',
+            timestamp: new Date().toISOString(),
+            uptime: process.uptime()
+        }));
+    } else {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found');
+    }
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🌐 שרת HTTP מאזין על פורט ${PORT}`);
+    console.log(`✅ Health check זמין ב: http://localhost:${PORT}/health`);
+});
+
 // טיפול בשגיאות וסגירה נקייה
 bot.on('polling_error', (error) => {
     utils.logError(error, 'bot_polling');
@@ -1142,36 +1423,3 @@ if (!envValidation.isValid) {
     envValidation.issues.forEach(issue => console.error(`   • ${issue}`));
     process.exit(1);
 }
-
-console.log('✅ הבוט פועל ומוכן לקבלת הודעות!');
-console.log(`🔧 מצב debug: ${config.bot.debugMode ? 'פעיל' : 'כבוי'}`);
-console.log(`🗃️ מיקום DB: ${config.database.path}`);
-
-if (config.bot.debugMode) {
-    console.log('📊 מידע מערכת:', JSON.stringify(utils.getSystemInfo(), null, 2));
-}
-
-// הוספת שרת HTTP פשוט כדי שהדיפלוי יזהה פורט פתוח
-const http = require('http');
-const PORT = process.env.PORT || 3000;
-
-const server = http.createServer((req, res) => {
-    // Health check endpoint
-    if (req.url === '/health' || req.url === '/') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-            status: 'ok',
-            service: 'telegram-barter-bot',
-            timestamp: new Date().toISOString(),
-            uptime: process.uptime()
-        }));
-    } else {
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('Not Found');
-    }
-});
-
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🌐 שרת HTTP מאזין על פורט ${PORT}`);
-    console.log(`✅ Health check זמין ב: http://localhost:${PORT}/health`);
-});

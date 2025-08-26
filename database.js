@@ -191,6 +191,60 @@ class Database {
                     }
                 });
 
+                // טבלת מילות מפתח להתראות
+                this.db.run(`
+                    CREATE TABLE IF NOT EXISTS keyword_alerts (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        keyword TEXT NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        is_active INTEGER DEFAULT 1,
+                        FOREIGN KEY (user_id) REFERENCES users (user_id),
+                        UNIQUE(user_id, keyword)
+                    )
+                `, (err) => {
+                    if (err && !err.message.includes('already exists')) {
+                        console.error('שגיאה ביצירת טבלת keyword_alerts:', err);
+                    }
+                });
+
+                // טבלת היסטוריית התראות שנשלחו
+                this.db.run(`
+                    CREATE TABLE IF NOT EXISTS sent_alerts (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        post_id INTEGER NOT NULL,
+                        keyword TEXT NOT NULL,
+                        sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (user_id),
+                        FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE,
+                        UNIQUE(user_id, post_id, keyword)
+                    )
+                `, (err) => {
+                    if (err && !err.message.includes('already exists')) {
+                        console.error('שגיאה ביצירת טבלת sent_alerts:', err);
+                    }
+                });
+
+                // אינדקסים לשיפור ביצועים
+                this.db.run(`
+                    CREATE INDEX IF NOT EXISTS idx_keyword_alerts_user 
+                    ON keyword_alerts(user_id)
+                `, (err) => {
+                    if (err && !err.message.includes('already exists')) {
+                        console.error('שגיאה ביצירת אינדקס keyword_alerts:', err);
+                    }
+                });
+
+                this.db.run(`
+                    CREATE INDEX IF NOT EXISTS idx_sent_alerts_user_post 
+                    ON sent_alerts(user_id, post_id)
+                `, (err) => {
+                    if (err && !err.message.includes('already exists')) {
+                        console.error('שגיאה ביצירת אינדקס sent_alerts:', err);
+                    }
+                });
+
                 console.log('✅ בסיס הנתונים הוכן בהצלחה');
                 resolve();
             });
@@ -588,6 +642,189 @@ class Database {
                 if (err) reject(err);
                 else resolve(row.count);
             });
+        });
+    }
+
+    // ===============================================
+    // 🔔 ניהול מילות מפתח להתראות
+    // ===============================================
+
+    // הוספת מילת מפתח למשתמש
+    addKeywordAlert(userId, keyword) {
+        return new Promise((resolve, reject) => {
+            const normalizedKeyword = keyword.trim().toLowerCase();
+            const sql = `
+                INSERT OR IGNORE INTO keyword_alerts (user_id, keyword) 
+                VALUES (?, ?)
+            `;
+            this.db.run(sql, [userId, normalizedKeyword], function(err) {
+                if (err) {
+                    console.error('שגיאה בהוספת מילת מפתח:', err);
+                    reject(err);
+                } else {
+                    resolve({ 
+                        success: this.changes > 0,
+                        id: this.lastID,
+                        message: this.changes > 0 ? 'מילת המפתח נוספה בהצלחה' : 'מילת המפתח כבר קיימת'
+                    });
+                }
+            });
+        });
+    }
+
+    // הסרת מילת מפתח של משתמש
+    removeKeywordAlert(userId, keyword) {
+        return new Promise((resolve, reject) => {
+            const normalizedKeyword = keyword.trim().toLowerCase();
+            const sql = `
+                DELETE FROM keyword_alerts 
+                WHERE user_id = ? AND keyword = ?
+            `;
+            this.db.run(sql, [userId, normalizedKeyword], function(err) {
+                if (err) {
+                    console.error('שגיאה בהסרת מילת מפתח:', err);
+                    reject(err);
+                } else {
+                    resolve({ 
+                        success: this.changes > 0,
+                        message: this.changes > 0 ? 'מילת המפתח הוסרה בהצלחה' : 'מילת המפתח לא נמצאה'
+                    });
+                }
+            });
+        });
+    }
+
+    // קבלת כל מילות המפתח של משתמש
+    getUserKeywords(userId) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                SELECT keyword, created_at, is_active 
+                FROM keyword_alerts 
+                WHERE user_id = ? AND is_active = 1
+                ORDER BY created_at DESC
+            `;
+            this.db.all(sql, [userId], (err, rows) => {
+                if (err) {
+                    console.error('שגיאה בקבלת מילות מפתח:', err);
+                    reject(err);
+                } else {
+                    resolve(rows || []);
+                }
+            });
+        });
+    }
+
+    // בדיקה האם מודעה מכילה מילות מפתח של משתמשים
+    checkPostForKeywords(postId, postTitle, postDescription) {
+        return new Promise((resolve, reject) => {
+            const postText = `${postTitle} ${postDescription}`.toLowerCase();
+            
+            const sql = `
+                SELECT DISTINCT ka.user_id, ka.keyword
+                FROM keyword_alerts ka
+                WHERE ka.is_active = 1
+                AND ka.user_id != (SELECT user_id FROM posts WHERE id = ?)
+                AND NOT EXISTS (
+                    SELECT 1 FROM sent_alerts sa 
+                    WHERE sa.user_id = ka.user_id 
+                    AND sa.post_id = ? 
+                    AND sa.keyword = ka.keyword
+                )
+            `;
+            
+            this.db.all(sql, [postId, postId], (err, rows) => {
+                if (err) {
+                    console.error('שגיאה בבדיקת מילות מפתח:', err);
+                    reject(err);
+                } else {
+                    // סינון מילות מפתח שנמצאות בטקסט
+                    const matches = rows.filter(row => 
+                        postText.includes(row.keyword.toLowerCase())
+                    );
+                    resolve(matches);
+                }
+            });
+        });
+    }
+
+    // רישום התראה שנשלחה
+    recordSentAlert(userId, postId, keyword) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                INSERT OR IGNORE INTO sent_alerts (user_id, post_id, keyword) 
+                VALUES (?, ?, ?)
+            `;
+            this.db.run(sql, [userId, postId, keyword], function(err) {
+                if (err) {
+                    console.error('שגיאה ברישום התראה:', err);
+                    reject(err);
+                } else {
+                    resolve({ success: true });
+                }
+            });
+        });
+    }
+
+    // ניקוי התראות ישנות (אופציונלי - למחוק התראות ישנות מ-30 יום)
+    cleanOldAlerts() {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                DELETE FROM sent_alerts 
+                WHERE sent_at < datetime('now', '-30 days')
+            `;
+            this.db.run(sql, function(err) {
+                if (err) {
+                    console.error('שגיאה בניקוי התראות ישנות:', err);
+                    reject(err);
+                } else {
+                    resolve({ deleted: this.changes });
+                }
+            });
+        });
+    }
+
+    // החלפת כל מילות המפתח של משתמש
+    setUserKeywords(userId, keywords) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                // התחל טרנזקציה
+                await new Promise((res, rej) => {
+                    this.db.run('BEGIN TRANSACTION', err => err ? rej(err) : res());
+                });
+
+                // מחק את כל מילות המפתח הקיימות
+                await new Promise((res, rej) => {
+                    this.db.run('DELETE FROM keyword_alerts WHERE user_id = ?', [userId], err => err ? rej(err) : res());
+                });
+
+                // הוסף את מילות המפתח החדשות
+                for (const keyword of keywords) {
+                    const normalizedKeyword = keyword.trim().toLowerCase();
+                    if (normalizedKeyword) {
+                        await new Promise((res, rej) => {
+                            this.db.run(
+                                'INSERT INTO keyword_alerts (user_id, keyword) VALUES (?, ?)',
+                                [userId, normalizedKeyword],
+                                err => err ? rej(err) : res()
+                            );
+                        });
+                    }
+                }
+
+                // סיים את הטרנזקציה
+                await new Promise((res, rej) => {
+                    this.db.run('COMMIT', err => err ? rej(err) : res());
+                });
+
+                resolve({ success: true, count: keywords.length });
+            } catch (error) {
+                // בטל את הטרנזקציה במקרה של שגיאה
+                await new Promise((res, rej) => {
+                    this.db.run('ROLLBACK', () => res());
+                });
+                console.error('שגיאה בהגדרת מילות מפתח:', error);
+                reject(error);
+            }
         });
     }
 
