@@ -980,8 +980,18 @@ bot.on('callback_query', async (callbackQuery) => {
         } else if (data.startsWith('confirm_delete_')) {
             await userHandler.executeDeletePost(callbackQuery);
         } else if (data.startsWith('cancel_delete_')) {
-            // ביטול מחיקה - חזרה למודעות שלי
-            await userHandler.showUserPostsDetailed(chatId, userId);
+            // ביטול מחיקה - חזרה לתצוגת המודעה בלבד
+            const postId = parseInt(data.replace('cancel_delete_', ''));
+            const post = await db.getPost(postId);
+            if (post) {
+                const postMessage = formatPostMessage(post);
+                await bot.editMessageText(postMessage, {
+                    chat_id: chatId,
+                    message_id: msg.message_id,
+                    parse_mode: 'Markdown',
+                    ...getPostActionsKeyboard(postId, userId)
+                });
+            }
             await bot.answerCallbackQuery(callbackQuery.id, {
                 text: 'המחיקה בוטלה',
                 show_alert: false
