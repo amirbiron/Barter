@@ -219,6 +219,8 @@ class Database {
 
     // חיפוש מודעות (FTS5)
     searchPosts(query, filters = {}) {
+        console.log(`🔍 searchPosts נקראת עם query: "${query}", filters:`, filters);
+        
         return new Promise((resolve, reject) => {
             let sql, params;
             
@@ -232,6 +234,7 @@ class Database {
                     WHERE posts_fts MATCH ? AND p.is_active = 1
                 `;
                 params = [query];
+                console.log(`📊 משתמש ב-FTS5 לחיפוש: "${query}"`);
                 
                 // הוספת סינונים
                 if (filters.pricingMode) {
@@ -247,6 +250,7 @@ class Database {
                     WHERE p.is_active = 1
                 `;
                 params = [];
+                console.log('📊 אין query - מחזיר את כל המודעות הפעילות');
                 
                 if (filters.pricingMode) {
                     sql += ` AND p.pricing_mode IN ('${filters.pricingMode}', 'both')`;
@@ -255,9 +259,15 @@ class Database {
             
             sql += ` ORDER BY p.created_at DESC LIMIT 20`;
             
+            console.log('🔧 SQL query:', sql.replace(/\s+/g, ' ').trim());
+            console.log('🔧 Parameters:', params);
+            
             this.db.all(sql, params, (err, rows) => {
-                if (err) reject(err);
-                else {
+                if (err) {
+                    console.error('❌ שגיאת מסד נתונים בחיפוש:', err);
+                    reject(err);
+                } else {
+                    console.log(`✅ נמצאו ${rows.length} תוצאות`);
                     // המרת JSON strings חזרה למערכים
                     const results = rows.map(row => ({
                         ...row,

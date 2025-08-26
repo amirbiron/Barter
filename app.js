@@ -126,18 +126,25 @@ bot.onText(/\/help|ℹ️ עזרה/, async (msg) => {
 
 // טיפול בהודעות טקסט (תפריט ראשי)
 bot.on('message', async (msg) => {
-    if (msg.text?.startsWith('/')) return; // התעלם מפקודות
+    // אם זו פקודה, דלג (הטיפול בפקודות למעלה)
+    if (msg.text && msg.text.startsWith('/')) return;
     
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     const text = msg.text;
     
+    // לוגים לאבחון
+    console.log(`📨 קיבלתי הודעה מ-${userId}: "${text}"`);
+    console.log(`🔧 config.bot.useEmojis = ${config.bot.useEmojis}`);
+    
+    // בדיקת מצב המשתמש
+    const userState = getUserState(userId);
+    console.log(`👤 מצב משתמש ${userId}:`, userState);
+    
     try {
-        // בדיקה אם המשתמש בתהליך עריכה
-        if (userHandler.isEditingSession(userId)) {
-            const handled = await userHandler.processEditInput(msg);
-            if (handled) return;
-        }
+        // בדיקה אם המשתמש נמצא באמצע עריכת מודעה
+        const editHandled = await userHandler.handleEditingSession(msg);
+        if (editHandled) return;
         
         // בדיקה אם המשתמש ממתין להזנת סיבת דיווח
         const userReportState = userHandler.userStates?.get(userId);
@@ -146,48 +153,66 @@ bot.on('message', async (msg) => {
             return;
         }
         
-        const userState = getUserState(userId);
-        
         // אם המשתמש באמצע תהליך פרסום
-        if (userState.step !== 'main') {
+        if (userState.step && userState.step !== 'main' && userState.step !== 'search') {
+            console.log(`📝 משתמש ${userId} באמצע תהליך פרסום, step: ${userState.step}`);
             await handlePostCreation(msg, userState);
             return;
         }
         
-        // תפריט ראשי
+        // בדיקת טקסט הכפתור עם לוג
+        const searchButtonText = (config.bot.useEmojis ? '🔍 ' : '') + 'חיפוש';
+        console.log(`🔍 השוואת כפתור חיפוש: "${text}" === "${searchButtonText}" ? ${text === searchButtonText}`);
+        
         switch (text) {
             case (config.bot.useEmojis ? '📝 ' : '') + 'פרסום שירות':
+                console.log('✅ זוהה: פרסום שירות');
                 await startPostCreation(chatId, userId);
                 break;
                 
-            case (config.bot.useEmojis ? '🔍 ' : '') + 'חיפוש':
+            case searchButtonText:
+                console.log('✅ זוהה: חיפוש');
                 await bot.sendMessage(chatId, '🔍 הקלידו מילות מפתח לחיפוש:', getMainKeyboard());
                 setUserState(userId, { step: 'search' });
                 break;
                 
             case (config.bot.useEmojis ? '📱 ' : '') + 'דפדוף':
+                console.log('✅ זוהה: דפדוף');
                 await showBrowseOptions(chatId);
                 break;
                 
             case (config.bot.useEmojis ? '📋 ' : '') + 'המודעות שלי':
+                console.log('✅ זוהה: המודעות שלי');
                 await userHandler.showUserPostsDetailed(chatId, userId);
                 break;
                 
             case (config.bot.useEmojis ? '⭐ ' : '') + 'מועדפים':
+                console.log('✅ זוהה: מועדפים');
                 await userHandler.showSavedPosts(chatId, userId);
                 break;
                 
+            case (config.bot.useEmojis ? 'ℹ️ ' : '') + 'עזרה':
+                console.log('✅ זוהה: עזרה');
+                await bot.sendMessage(chatId, config.messages.help, {
+                    parse_mode: 'Markdown',
+                    ...getMainKeyboard()
+                });
+                break;
+                
             default:
+                console.log('❓ לא זוהה כפתור, בודק מצב משתמש...');
                 // אם המשתמש במצב חיפוש
                 if (userState.step === 'search') {
+                    console.log('🔍 משתמש במצב חיפוש, מבצע חיפוש...');
                     await handleSearch(chatId, text);
                     clearUserState(userId);
                 } else {
+                    console.log('⚠️ פקודה לא מוכרת');
                     await bot.sendMessage(chatId, config.messages.unknownCommand, getMainKeyboard());
                 }
         }
-        
     } catch (error) {
+        console.error('❌ שגיאה בטיפול בהודעה:', error);
         utils.logError(error, 'message_handler');
         await bot.sendMessage(chatId, config.messages.error);
         clearUserState(userId);
@@ -318,17 +343,25 @@ async function savePost(chatId, userId, postData) {
 }
 
 async function handleSearch(chatId, query) {
+    console.log(`🔍 handleSearch נקראת עבור chatId: ${chatId}, query: "${query}"`);
+    
     try {
         const results = await db.searchPosts(query);
+        console.log(`📊 תוצאות חיפוש: ${results.length} מודעות נמצאו`);
         
         if (results.length === 0) {
+            console.log('❌ לא נמצאו תוצאות');
             await bot.sendMessage(chatId, config.messages.noResults, getMainKeyboard());
             return;
         }
         
         await bot.sendMessage(chatId, `🔍 נמצאו ${results.length} תוצאות:`, getMainKeyboard());
         
-        for (const post of results.slice(0, config.content.maxSearchResults)) {
+        const maxResults = config.content.maxSearchResults || 5;
+        console.log(`📤 מציג ${Math.min(results.length, maxResults)} תוצאות מתוך ${results.length}`);
+        
+        for (const post of results.slice(0, maxResults)) {
+            console.log(`  - מציג מודעה ID: ${post.id}, כותרת: ${post.title}`);
             const message = formatPostMessage(post);
             await bot.sendMessage(chatId, message, {
                 parse_mode: 'Markdown',
@@ -339,13 +372,15 @@ async function handleSearch(chatId, query) {
             userHandler.trackInteraction(0, post.id, 'views'); // 0 = system user
         }
         
-        if (results.length > config.content.maxSearchResults) {
-            await bot.sendMessage(chatId, `📄 יש עוד ${results.length - config.content.maxSearchResults} תוצאות. חדדו את החיפוש לתוצאות טובות יותר.`);
+        if (results.length > maxResults) {
+            await bot.sendMessage(chatId, `📄 יש עוד ${results.length - maxResults} תוצאות. חדדו את החיפוש לתוצאות טובות יותר.`);
         }
         
         utils.logAction(chatId, 'search', { query, resultsCount: results.length });
+        console.log('✅ חיפוש הושלם בהצלחה');
         
     } catch (error) {
+        console.error('❌ שגיאה בחיפוש:', error);
         utils.logError(error, 'search_handler');
         await bot.sendMessage(chatId, config.messages.error);
     }
