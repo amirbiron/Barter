@@ -87,6 +87,7 @@ class Database {
     async init() {
         return new Promise((resolve, reject) => {
             this.db.serialize(() => {
+                this.db.run(`PRAGMA foreign_keys = ON`);
                 // טבלת משתמשים
                 this.db.run(`
                     CREATE TABLE IF NOT EXISTS users (
@@ -303,8 +304,7 @@ class Database {
     deletePost(postId, userId) {
         return new Promise((resolve, reject) => {
             const sql = `
-                UPDATE posts 
-                SET is_active = 0, updated_at = CURRENT_TIMESTAMP
+                DELETE FROM posts 
                 WHERE id = ? AND user_id = ?
             `;
             this.db.run(sql, [postId, userId], function(err) {
