@@ -17,7 +17,7 @@
         "sqlite3": "^5.1.7"
     },
     "devDependencies": {
-        "eslint": "^8.57.1",
+        "eslint": "^9.34.0",
         "eslint-config-prettier": "^9.1.2",
         "nodemon": "^3.1.4",
         "prettier": "^3.6.2"
