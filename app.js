@@ -112,6 +112,7 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
                 [
                     { command: 'start', description: '🏠 התחלה מחדש' },
                     { command: 'testpost', description: '🔧 יצירת מודעת בדיקה פרטית' },
+                    { command: 'stats', description: '📊 סטטיסטיקות המערכת' },
                 ],
                 {
                     scope: {
@@ -210,6 +211,71 @@ bot.onText(/\/testpost/, async (msg) => {
         parse_mode: 'Markdown',
     });
     setUserState(userId, { step: 'title', isTestPost: true });
+});
+
+// פקודת מנהל - סטטיסטיקות המערכת
+bot.onText(/\/stats/, async (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+
+    // בדיקת הרשאות
+    if (!config.isAdmin(userId)) {
+        await bot.sendMessage(chatId, '❌ פקודה זו זמינה למנהלים בלבד');
+        return;
+    }
+
+    try {
+        // הצגת הודעת טעינה
+        const loadingMsg = await bot.sendMessage(chatId, '📊 *טוען סטטיסטיקות...*', {
+            parse_mode: 'Markdown',
+        });
+
+        // קבלת הסטטיסטיקות מהמסד נתונים
+        const [generalStats, usersLastWeek, usersLastMonth, postsLastWeek, postsLastMonth] = await Promise.all([
+            db.getGeneralStats(),
+            db.getUserStatsLastWeek(),
+            db.getUserStatsLastMonth(),
+            db.getPostStatsLastWeek(),
+            db.getPostStatsLastMonth()
+        ]);
+
+        // יצירת הודעת הסטטיסטיקות
+        const e = config.bot.useEmojis;
+        let statsMessage = `📊 *סטטיסטיקות המערכת*\n\n`;
+        
+        // סטטיסטיקות כלליות
+        statsMessage += `${e ? '👥' : '•'} *סה״כ משתמשים פעילים:* ${generalStats.totalUsers}\n`;
+        statsMessage += `${e ? '📋' : '•'} *מודעות פעילות:* ${generalStats.activePosts}\n`;
+        statsMessage += `${e ? '⭐' : '•'} *מודעות שמורות:* ${generalStats.savedPosts}\n`;
+        statsMessage += `${e ? '🔔' : '•'} *התראות פעילות:* ${generalStats.keywordAlerts}\n\n`;
+        
+        // סטטיסטיקות משתמשים
+        statsMessage += `${e ? '📈' : '•'} *משתמשים חדשים:*\n`;
+        statsMessage += `   ${e ? '📅' : '•'} השבוע: ${usersLastWeek}\n`;
+        statsMessage += `   ${e ? '🗓️' : '•'} החודש: ${usersLastMonth}\n\n`;
+        
+        // סטטיסטיקות מודעות
+        statsMessage += `${e ? '📝' : '•'} *מודעות חדשות:*\n`;
+        statsMessage += `   ${e ? '📅' : '•'} השבוע: ${postsLastWeek}\n`;
+        statsMessage += `   ${e ? '🗓️' : '•'} החודש: ${postsLastMonth}\n\n`;
+        
+        // מידע נוסף
+        const now = new Date();
+        statsMessage += `${e ? '🕐' : '•'} *עודכן:* ${now.toLocaleString('he-IL')}\n`;
+        statsMessage += `${e ? '🤖' : '•'} *זמן פעילות:* ${Math.floor(process.uptime() / 60)} דקות`;
+
+        // עדכון ההודעה עם הסטטיסטיקות
+        await bot.editMessageText(statsMessage, {
+            chat_id: chatId,
+            message_id: loadingMsg.message_id,
+            parse_mode: 'Markdown',
+        });
+
+        utils.logAction(userId, 'admin_stats_viewed');
+    } catch (error) {
+        utils.logError(error, 'stats_command');
+        await bot.sendMessage(chatId, '❌ שגיאה בטעינת הסטטיסטיקות. נסה שוב מאוחר יותר.');
+    }
 });
 
 // טיפול בהודעות טקסט (תפריט ראשי)
