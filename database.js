@@ -1009,6 +1009,129 @@ class Database {
         });
     }
 
+    // ===============================================
+    // 📊 סטטיסטיקות למנהלים
+    // ===============================================
+
+    // קבלת סטטיסטיקות משתמשים בשבוע האחרון
+    getUserStatsLastWeek() {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                SELECT COUNT(*) as new_users
+                FROM users 
+                WHERE created_at >= datetime('now', '-7 days')
+            `;
+            this.db.get(sql, [], (err, row) => {
+                if (err) {
+                    console.error('שגיאה בקבלת סטטיסטיקות משתמשים שבועיות:', err);
+                    reject(err);
+                } else {
+                    resolve(row.new_users || 0);
+                }
+            });
+        });
+    }
+
+    // קבלת סטטיסטיקות משתמשים בחודש האחרון
+    getUserStatsLastMonth() {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                SELECT COUNT(*) as new_users
+                FROM users 
+                WHERE created_at >= datetime('now', '-30 days')
+            `;
+            this.db.get(sql, [], (err, row) => {
+                if (err) {
+                    console.error('שגיאה בקבלת סטטיסטיקות משתמשים חודשיות:', err);
+                    reject(err);
+                } else {
+                    resolve(row.new_users || 0);
+                }
+            });
+        });
+    }
+
+    // קבלת סטטיסטיקות מודעות בשבוע האחרון
+    getPostStatsLastWeek() {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                SELECT COUNT(*) as new_posts
+                FROM posts 
+                WHERE created_at >= datetime('now', '-7 days')
+                AND visibility = 'public'
+            `;
+            this.db.get(sql, [], (err, row) => {
+                if (err) {
+                    console.error('שגיאה בקבלת סטטיסטיקות מודעות שבועיות:', err);
+                    reject(err);
+                } else {
+                    resolve(row.new_posts || 0);
+                }
+            });
+        });
+    }
+
+    // קבלת סטטיסטיקות מודעות בחודש האחרון
+    getPostStatsLastMonth() {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                SELECT COUNT(*) as new_posts
+                FROM posts 
+                WHERE created_at >= datetime('now', '-30 days')
+                AND visibility = 'public'
+            `;
+            this.db.get(sql, [], (err, row) => {
+                if (err) {
+                    console.error('שגיאה בקבלת סטטיסטיקות מודעות חודשיות:', err);
+                    reject(err);
+                } else {
+                    resolve(row.new_posts || 0);
+                }
+            });
+        });
+    }
+
+    // קבלת סטטיסטיקות כלליות של המערכת
+    getGeneralStats() {
+        return new Promise((resolve, reject) => {
+            const queries = [
+                // סה"כ משתמשים
+                'SELECT COUNT(*) as total_users FROM users WHERE is_active = 1',
+                // סה"כ מודעות פעילות
+                'SELECT COUNT(*) as active_posts FROM posts WHERE is_active = 1 AND visibility = "public"',
+                // סה"כ מודעות שמורות
+                'SELECT COUNT(*) as saved_posts FROM saved_posts',
+                // סה"כ מילות מפתח להתראות
+                'SELECT COUNT(*) as keyword_alerts FROM keyword_alerts WHERE is_active = 1'
+            ];
+
+            const results = {};
+            let completed = 0;
+
+            queries.forEach((sql, index) => {
+                this.db.get(sql, [], (err, row) => {
+                    if (err) {
+                        console.error(`שגיאה בסטטיסטיקה ${index}:`, err);
+                        reject(err);
+                        return;
+                    }
+
+                    switch(index) {
+                        case 0: results.totalUsers = row.total_users || 0; break;
+                        case 1: results.activePosts = row.active_posts || 0; break;
+                        case 2: results.savedPosts = row.saved_posts || 0; break;
+                        case 3: results.keywordAlerts = row.keyword_alerts || 0; break;
+                    }
+
+                    completed++;
+                    if (completed === queries.length) {
+                        resolve(results);
+                    }
+                });
+            });
+        });
+    }
+
     // סגירת החיבור
     close() {
         return new Promise((resolve) => {
