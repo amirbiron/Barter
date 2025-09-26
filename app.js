@@ -178,6 +178,8 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
 
 bot.onText(/\/help|ℹ️ עזרה/, async (msg) => {
     const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    try { reporter.report_activity(userId); } catch (e) {}
 
     await bot.sendMessage(chatId, config.messages.help, {
         parse_mode: 'Markdown',
@@ -189,6 +191,7 @@ bot.onText(/\/help|ℹ️ עזרה/, async (msg) => {
 bot.onText(/\/help/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
+    try { reporter.report_activity(userId); } catch (e) {}
 
     let helpMessage = config.messages.help;
 
@@ -209,6 +212,7 @@ bot.onText(/\/help/, async (msg) => {
 bot.onText(/\/testpost/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
+    try { reporter.report_activity(userId); } catch (e) {}
 
     // בדיקת הרשאות
     if (!config.isAdmin(userId)) {
@@ -226,6 +230,7 @@ bot.onText(/\/testpost/, async (msg) => {
 bot.onText(/\/stats/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
+    try { reporter.report_activity(userId); } catch (e) {}
 
     // בדיקת הרשאות
     if (!config.isAdmin(userId)) {
@@ -294,6 +299,7 @@ bot.on('message', async (msg) => {
 
     const chatId = msg.chat.id;
     const userId = msg.from.id;
+    try { reporter.report_activity(userId); } catch (e) {}
     const text = msg.text;
 
     // תחזוקה גלובלית: חסימת אינטראקציות והצגת הודעה ידידותית
@@ -948,6 +954,7 @@ bot.on('callback_query', async (callbackQuery) => {
     const msg = callbackQuery.message;
     const chatId = msg.chat.id;
     const userId = callbackQuery.from.id;
+    try { reporter.report_activity(userId); } catch (e) {}
     const data = callbackQuery.data;
 
     // תחזוקה גלובלית: חסימת אינטראקציות והצגת הודעה ידידותית
@@ -2017,6 +2024,7 @@ async function gracefulShutdown(signal) {
         }
 
         // סגירת בסיס הנתונים
+        try { await reporter.close(); } catch (e) {}
         await db.close();
 
         // עצירת הpolling
