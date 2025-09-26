@@ -963,7 +963,7 @@ bot.on('callback_query', async (callbackQuery) => {
     const userId = callbackQuery.from.id;
     const data = callbackQuery.data;
 
-    reporter.report_activity(userId);
+    reporter.reportActivity(userId);
 
     // תחזוקה גלובלית: חסימת אינטראקציות והצגת הודעה ידידותית
     if (isMaintenanceMode()) {
