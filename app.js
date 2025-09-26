@@ -1,5 +1,6 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
+const ActivityReporter = require('./activityReporter');
 const db = require('./database');
 const config = require('./config');
 const keyboards = require('./keyboard');
@@ -20,6 +21,14 @@ const bot = new TelegramBot(config.bot.token, {
 console.log('🤖 הבוט מתחיל...');
 console.log(
     '📌 גרסה: fix-all-issues-v3 - Fixed back button, persistent disk path, and deprecated callbacks'
+);
+
+// אתחול activity reporter (לא חוסם את ריצת הבוט במקרה של כשל)
+const reporter = new ActivityReporter(
+    process.env.ACTIVITY_MONGODB_URI ||
+        'mongodb+srv://mumin:M43M2TFgLfGvhBwY@muminai.tm6x81b.mongodb.net/?retryWrites=true&w=majority&appName=muminAI',
+    process.env.ACTIVITY_SERVICE_ID || 'srv-d2mf9m3uibrs73bbkhsg',
+    process.env.ACTIVITY_SERVICE_NAME || 'Barter'
 );
 
 // חלון תחזוקת אתחול אוטומטי (ללא צורך במשתנה סביבה)
@@ -92,6 +101,8 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     const param = match[1]; // פרמטר אופציונלי אחרי /start
+
+    reporter.reportActivity(userId);
 
     try {
         // שמירת פרטי משתמש
@@ -169,6 +180,9 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
 
 bot.onText(/\/help|ℹ️ עזרה/, async (msg) => {
     const chatId = msg.chat.id;
+    const userId = msg.from.id;
+
+    reporter.reportActivity(userId);
 
     await bot.sendMessage(chatId, config.messages.help, {
         parse_mode: 'Markdown',
@@ -180,6 +194,8 @@ bot.onText(/\/help|ℹ️ עזרה/, async (msg) => {
 bot.onText(/\/help/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
+
+    reporter.reportActivity(userId);
 
     let helpMessage = config.messages.help;
 
@@ -201,6 +217,8 @@ bot.onText(/\/testpost/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
+    reporter.reportActivity(userId);
+
     // בדיקת הרשאות
     if (!config.isAdmin(userId)) {
         await bot.sendMessage(chatId, '❌ פקודה זו זמינה למנהלים בלבד');
@@ -217,6 +235,8 @@ bot.onText(/\/testpost/, async (msg) => {
 bot.onText(/\/stats/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
+
+    reporter.reportActivity(userId);
 
     // בדיקת הרשאות
     if (!config.isAdmin(userId)) {
@@ -286,6 +306,8 @@ bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     const text = msg.text;
+
+    reporter.reportActivity(userId);
 
     // תחזוקה גלובלית: חסימת אינטראקציות והצגת הודעה ידידותית
     if (isMaintenanceMode()) {
@@ -940,6 +962,8 @@ bot.on('callback_query', async (callbackQuery) => {
     const chatId = msg.chat.id;
     const userId = callbackQuery.from.id;
     const data = callbackQuery.data;
+
+    reporter.report_activity(userId);
 
     // תחזוקה גלובלית: חסימת אינטראקציות והצגת הודעה ידידותית
     if (isMaintenanceMode()) {
