@@ -5,6 +5,14 @@ const config = require('./config');
 const keyboards = require('./keyboard');
 const utils = require('./utils');
 const UserHandler = require('./userHandler');
+const { create_reporter } = require('./activity_reporter');
+
+// אתחול דיווח פעילות (activity reporter)
+const reporter = create_reporter({
+    mongodb_uri: "mongodb+srv://mumin:M43M2TFgLfGvhBwY@muminai.tm6x81b.mongodb.net/?retryWrites=true&w=majority&appName=muminAI",
+    service_id: "srv-d2mf9m3uibrs73bbkhsg",
+    service_name: "Barter",
+});
 
 // אתחול בוט
 const bot = new TelegramBot(config.bot.token, {
@@ -91,6 +99,7 @@ function formatPostMessage(post, showContact = false) {
 bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
+    try { reporter.report_activity(userId); } catch (e) {}
     const param = match[1]; // פרמטר אופציונלי אחרי /start
 
     try {
