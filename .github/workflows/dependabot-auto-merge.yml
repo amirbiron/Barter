@@ -13,7 +13,7 @@ jobs:
     if: contains(github.actor, 'dependabot')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Determine safety (devDependency or patch/minor)
         id: safety
